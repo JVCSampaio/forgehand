@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "forgehand-local"
+version = "0.1.0"
+description = "Offload bounded coding work to one local model without carrying the conversation history."
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "John Sampaio" }]
+requires-python = ">=3.11"
+keywords = ["agents", "codex", "local-llm", "mcp", "token-efficiency"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+dependencies = [
+  "httpx>=0.28,<1",
+  "mcp>=1.26,<2",
+  "pydantic>=2.13,<3",
+  "PyYAML>=6,<7",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10", "pytest-asyncio>=0.25,<2"]
+dev = ["build>=1.2,<2", "ruff>=0.12,<1", "pytest>=8,<10", "pytest-asyncio>=0.25,<2"]
+
+[project.scripts]
+forgehand = "forgehand.cli:main"
+forgehand-mcp = "forgehand.mcp_server:main"
+
+[project.urls]
+Homepage = "https://github.com/JVCSampaio/forgehand"
+Documentation = "https://github.com/JVCSampaio/forgehand#readme"
+Issues = "https://github.com/JVCSampaio/forgehand/issues"
+Source = "https://github.com/JVCSampaio/forgehand"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

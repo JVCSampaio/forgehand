@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Forgehand</title>
+  <desc id="desc">A compact anvil and spark mark</desc>
+  <defs>
+    <linearGradient id="g" x1="18" y1="14" x2="106" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffb454"/>
+      <stop offset="1" stop-color="#e4572e"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="#111827"/>
+  <path fill="url(#g)" d="M23 48h69c9 0 14-5 16-13h7c0 17-9 28-27 31l-8 2-8 12H45L34 67H23V48Z"/>
+  <path fill="#f8fafc" d="M48 84h27l8 23H40l8-23Z"/>
+  <path fill="#ffcf70" d="m87 19 4 10 10 4-10 4-4 10-4-10-10-4 10-4 4-10Z"/>
+</svg>

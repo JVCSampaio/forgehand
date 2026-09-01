@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If Forgehand supports your research, please cite this software."
+title: "Forgehand"
+type: software
+authors:
+  - family-names: "Sampaio"
+    given-names: "John"
+repository-code: "https://github.com/JVCSampaio/forgehand"
+url: "https://github.com/JVCSampaio/forgehand"
+license: MIT
+version: 0.1.0
+date-released: 2026-09-01

@@ -1,0 +1,15 @@
+Forgehand
+Copyright (c) 2026 John Sampaio
+
+This project includes substantial adaptations of MIT-licensed work from
+RANJIANG23/codex-hermes-worker:
+https://github.com/RANJIANG23/codex-hermes-worker
+
+The original MIT copyright and permission notice are retained in LICENSE.
+
+The state-centric execution design is inspired by:
+SKILL.state: Scalable Long-Horizon Agent Skills
+https://arxiv.org/abs/2608.26263
+
+Forgehand is not affiliated with or endorsed by OpenAI, the Model Context
+Protocol project, the SKILL.state authors, Ornith AI, or the upstream project.

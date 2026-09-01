@@ -1,0 +1,25 @@
+name: Feature request
+description: Propose a focused improvement with measurable value
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What concrete workflow is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Success criteria
+      description: How should quality, safety, tokens, or latency be measured?
+    validations:
+      required: true

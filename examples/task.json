@@ -1,0 +1,23 @@
+{
+  "repository_root": "/absolute/path/to/repository",
+  "objective": "Update the parser and add focused regression coverage.",
+  "scope": ["src/parser", "tests/parser"],
+  "constraints": [
+    "Do not change the public API.",
+    "Do not add dependencies."
+  ],
+  "acceptance_criteria": [
+    "The reported parser bug is covered by a regression test.",
+    "The approved parser test command exits successfully."
+  ],
+  "commands": [
+    {
+      "command_id": "parser-tests",
+      "argv": ["python", "-m", "pytest", "-q", "tests/parser"],
+      "cwd": ".",
+      "timeout_seconds": 300
+    }
+  ],
+  "max_iterations": 12,
+  "keep_worktree": true
+}
