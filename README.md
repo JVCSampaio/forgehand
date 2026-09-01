@@ -15,6 +15,9 @@ tasks to an OpenAI-compatible local model. Each step receives bounded current
 state, deterministic repository facts, and only the latest observation — never
 the accumulated chat transcript.
 
+Bounded batch reads let the worker inspect up to eight scoped files in one model
+round-trip without turning the conversation transcript into memory.
+
 ## Why
 
 Cloud coding agents are excellent architects and reviewers. They are also an
@@ -51,7 +54,8 @@ forgehand init --model your-model-id --worker-name "My local worker" --force
 Then ask Codex:
 
 > Use Forgehand to update the parser. Only modify `src/parser` and `tests/parser`.
-> Run the approved parser tests, inspect the final diff, and review the result.
+> Require the approved parser tests to pass, inspect the final diff, and review
+> the result. I acknowledge that approved commands inherit host permissions and network.
 
 Codex can call four MCP tools: `forgehand_health`, `forgehand_delegate`,
 `forgehand_tasks`, and `forgehand_result`.
@@ -71,13 +75,17 @@ local-worker usage. It never presents those numbers as estimated Codex savings.
 - every task runs in a detached worktree;
 - the worker can access only declared repository-relative paths;
 - commands are supervisor-provided `argv` arrays selected by ID, without a shell;
-- token-like environment variables are removed from approved command processes;
+- host commands require an explicit risk acknowledgement in every task contract;
+- required command IDs must all exit zero before `success` is accepted;
+- common credential-bearing environment variables and interactive Git prompts are removed;
 - state, observation, output, steps, changed files, and retries have hard limits;
 - full logs and diffs stay local; compact receipts return to the supervisor;
 - Codex review is always required before integration.
 
-Approved commands still inherit the host network stack and OS permissions. Only
-approve commands you trust.
+Forgehand does **not** provide an OS-level process sandbox. Approved commands still
+inherit the host network stack and OS permissions, even though they run without a
+shell and with a scrubbed environment. Only approve commands you trust. See the
+[task contract](docs/task-contract.md) and [security model](SECURITY.md).
 
 ## Token evidence
 
@@ -100,6 +108,7 @@ History is archived, not attended.
 
 - [Architecture](docs/architecture.md)
 - [Configuration](docs/configuration.md)
+- [Task contracts and deterministic gates](docs/task-contract.md)
 - [Codex and MCP setup](docs/codex.md)
 - [Security model](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)

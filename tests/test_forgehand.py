@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,7 @@ from forgehand.models import (
     AgentState,
     ForgehandDecision,
     InferenceResult,
+    RepoCommand,
     StateOperation,
     StepUsage,
     TaskRequest,
@@ -153,6 +155,25 @@ class InvalidThenScriptedInference(ScriptedInference):
         return super().decide(context)
 
 
+class FailedCommandThenCompleteInference:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def decide(self, context: dict[str, Any]) -> InferenceResult:
+        self.calls += 1
+        if self.calls == 1:
+            return _decision(
+                int(context["state_revision"]),
+                "run_command",
+                {"command_id": "validate"},
+            )
+        return _decision(
+            int(context["state_revision"]),
+            "complete",
+            {"status": "success", "summary": "Incorrectly claimed success."},
+        )
+
+
 def _request(repository: Path) -> TaskRequest:
     return TaskRequest(
         repository_root=str(repository),
@@ -179,6 +200,7 @@ def test_stateless_bounded_task_loop(tmp_path: Path) -> None:
     assert result["metrics"]["model_calls"] == 5
     assert result["metrics"]["total_tokens"] == 600
     assert result["review_required"] is True
+    assert result["required_command_gate"]["passed"] is True
     assert Path(result["diff_path"]).is_file()
     assert (repository / "src" / "value.txt").read_text(encoding="utf-8") == "before\n"
     assert all("history" not in context for context in inference.contexts)
@@ -230,6 +252,142 @@ def test_completion_normalizes_single_notes_without_another_model_call(tmp_path:
     assert completed["result"]["acceptance_notes"] == ["The requested content is present."]
 
 
+def test_success_requires_every_required_command_to_pass(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    request = TaskRequest(
+        repository_root=str(repository),
+        objective="Validate the fixture.",
+        scope=["src"],
+        acceptance_criteria=["The validation command passes."],
+        commands=[
+            RepoCommand(
+                command_id="validate",
+                argv=[sys.executable, "-c", "print('validated')"],
+            )
+        ],
+        required_command_ids=["validate"],
+        acknowledge_host_command_risk=True,
+    )
+    executor = ForgehandExecutor(
+        _config(tmp_path, repository),
+        request,
+        checkout=repository,
+        task_root=tmp_path / "task",
+    )
+    completion = WorkerAction(
+        type="complete",
+        arguments={"status": "success", "summary": "Validated."},
+    )
+
+    with pytest.raises(ValueError, match="not run: validate"):
+        executor.execute(1, completion)
+
+    command = executor.execute(
+        2,
+        WorkerAction(type="run_command", arguments={"command_id": "validate"}),
+    )
+    completed = executor.execute(3, completion)
+
+    assert command["result"]["exit_code"] == 0
+    assert completed["result"]["status"] == "success"
+    assert executor.required_command_gate()["passed"] is True
+
+
+def test_failed_required_command_blocks_success(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    request = TaskRequest(
+        repository_root=str(repository),
+        objective="Validate the fixture.",
+        scope=["src"],
+        acceptance_criteria=["The validation command passes."],
+        commands=[
+            RepoCommand(
+                command_id="validate",
+                argv=[sys.executable, "-c", "raise SystemExit(7)"],
+            )
+        ],
+        required_command_ids=["validate"],
+        acknowledge_host_command_risk=True,
+    )
+    executor = ForgehandExecutor(
+        _config(tmp_path, repository),
+        request,
+        checkout=repository,
+        task_root=tmp_path / "task",
+    )
+    executor.execute(
+        1,
+        WorkerAction(type="run_command", arguments={"command_id": "validate"}),
+    )
+
+    with pytest.raises(ValueError, match="failed: validate"):
+        executor.execute(
+            2,
+            WorkerAction(
+                type="complete",
+                arguments={"status": "success", "summary": "Validated."},
+            ),
+        )
+
+
+def test_blocked_receipt_preserves_failed_required_command_evidence(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    config = _config(tmp_path, repository)
+    request = TaskRequest(
+        repository_root=str(repository),
+        objective="Validate the fixture.",
+        scope=["src"],
+        acceptance_criteria=["The validation command passes."],
+        commands=[
+            RepoCommand(
+                command_id="validate",
+                argv=[sys.executable, "-c", "raise SystemExit(9)"],
+            )
+        ],
+        required_command_ids=["validate"],
+        acknowledge_host_command_risk=True,
+        max_iterations=3,
+        keep_worktree=False,
+    )
+
+    result = TaskRunner(
+        config,
+        ForgehandRuntime(config, FailedCommandThenCompleteInference()),
+    ).run(request)
+
+    assert result["status"] == "blocked"
+    assert result["commands_run"] == ["validate"]
+    assert result["command_results"]["validate"]["exit_code"] == 9
+    assert result["required_command_gate"] == {
+        "required_command_ids": ["validate"],
+        "missing_command_ids": [],
+        "failed_command_ids": ["validate"],
+        "passed": False,
+    }
+
+
+def test_host_commands_require_explicit_risk_acknowledgement(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+
+    with pytest.raises(ValueError, match="inherit host OS permissions and network"):
+        TaskRequest(
+            repository_root=str(repository),
+            objective="Run a check.",
+            scope=["src"],
+            acceptance_criteria=["The check passes."],
+            commands=[RepoCommand(command_id="check", argv=["tool", "--check"])],
+        )
+
+    with pytest.raises(ValueError, match="must reference declared commands"):
+        TaskRequest(
+            repository_root=str(repository),
+            objective="Run a check.",
+            scope=["src"],
+            acceptance_criteria=["The check passes."],
+            required_command_ids=["missing"],
+        )
+
+
 def test_numeric_action_arguments_accept_json_digit_strings(tmp_path: Path) -> None:
     repository = _repository(tmp_path)
     executor = ForgehandExecutor(
@@ -275,6 +433,45 @@ def test_numeric_action_arguments_accept_json_digit_strings(tmp_path: Path) -> N
         WorkerAction(type="read_file", arguments={"path": "src/value.txt"}),
     )
     assert reread["result"]["text"] == "after\n"
+
+
+def test_bounded_batch_read_reduces_multi_file_round_trips(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    (repository / "src" / "second.txt").write_text("second\n", encoding="utf-8")
+    executor = ForgehandExecutor(
+        _config(tmp_path, repository),
+        _request(repository),
+        checkout=repository,
+        task_root=tmp_path / "task",
+    )
+
+    batch = executor.execute(
+        1,
+        WorkerAction(
+            type="read_files",
+            arguments={"paths": ["src/value.txt", "src/second.txt"]},
+        ),
+    )
+
+    assert [item["path"] for item in batch["result"]["files"]] == [
+        "src/value.txt",
+        "src/second.txt",
+    ]
+    assert batch["result"]["returned_file_count"] == 2
+    assert batch["result"]["observation_budget_exhausted"] is False
+    assert '"action":"read_files"' in batch["observation"]
+    assert (
+        len(batch["observation"]) <= _config(tmp_path, repository).forgehand.max_observation_chars
+    )
+
+    with pytest.raises(ValueError, match="already read completely"):
+        executor.execute(
+            2,
+            WorkerAction(
+                type="read_files",
+                arguments={"paths": ["src/value.txt", "src/second.txt"]},
+            ),
+        )
 
 
 def test_billed_invalid_response_is_counted(tmp_path: Path) -> None:

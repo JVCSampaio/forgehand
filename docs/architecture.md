@@ -43,3 +43,12 @@ fallback provider. This keeps GPU use, behavior, and accounting predictable.
 The worker proposes actions; Forgehand validates and executes them. A model claim
 is never evidence. Git, filesystem checks, command exit codes, diffs, and tests are
 the evidence returned for supervisor review.
+
+Natural-language acceptance criteria guide the worker and reviewer. Deterministic
+acceptance gates are expressed as `required_command_ids`: every named command must
+have run and exited zero before Forgehand permits a `success` completion. This gate
+does not replace final supervisor review.
+
+File capabilities are enforced inside the detached worktree. Process execution is a
+separate trust boundary: approved commands use `shell=False` and a scrubbed environment,
+but retain host OS permissions and network access. Forgehand does not claim an OS sandbox.

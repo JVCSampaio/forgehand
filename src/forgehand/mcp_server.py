@@ -30,7 +30,7 @@ LOCAL_WRITE = ToolAnnotations(
     readOnlyHint=False,
     destructiveHint=False,
     idempotentHint=False,
-    openWorldHint=False,
+    openWorldHint=True,
 )
 
 
@@ -73,6 +73,11 @@ def forgehand_health() -> dict[str, Any]:
             "shell_disabled": True,
             "worker_network_tools": False,
             "command_environment_secrets_removed": True,
+            "os_level_command_sandbox": False,
+            "commands_inherit_host_network": True,
+            "commands_inherit_host_os_permissions": True,
+            "host_command_risk_acknowledgement_required": True,
+            "required_command_success_gate": True,
             "final_review_required": True,
         },
     }
@@ -86,6 +91,8 @@ def forgehand_delegate(
     acceptance_criteria: list[str],
     constraints: list[str] | None = None,
     commands: list[RepoCommand] | None = None,
+    required_command_ids: list[str] | None = None,
+    acknowledge_host_command_risk: bool = False,
     base_revision: str = "HEAD",
     max_iterations: int = 10,
     keep_worktree: bool = True,
@@ -94,7 +101,9 @@ def forgehand_delegate(
 
     The repository must be registered first. Scope contains the only paths the
     worker may read or edit. Commands are supervisor-authored argv arrays invoked
-    by ID without a shell. The compact result includes patch and evidence paths.
+    by ID without a shell, but inherit host permissions and network. Set the risk
+    acknowledgement explicitly whenever commands are present. Required command IDs
+    must all exit zero before the worker can return success.
     """
     request = TaskRequest(
         repository_root=repository_root,
@@ -103,6 +112,8 @@ def forgehand_delegate(
         constraints=constraints or [],
         acceptance_criteria=acceptance_criteria,
         commands=commands or [],
+        required_command_ids=required_command_ids or [],
+        acknowledge_host_command_risk=acknowledge_host_command_risk,
         base_revision=base_revision,
         max_iterations=max_iterations,
         keep_worktree=keep_worktree,

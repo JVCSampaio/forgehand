@@ -87,6 +87,8 @@ class TaskRunner:
             "constraints": request.constraints,
             "acceptance_criteria": request.acceptance_criteria,
             "commands": [command.model_dump() for command in request.commands],
+            "required_command_ids": request.required_command_ids,
+            "acknowledge_host_command_risk": request.acknowledge_host_command_risk,
             "max_iterations": request.max_iterations,
             "limits": {
                 "max_file_chars": self.config.repo_tasks.max_file_chars,
@@ -169,6 +171,11 @@ class TaskRunner:
             status = "blocked"
         if out_of_scope or too_many_files:
             status = "needs_review"
+        required_command_gate = (
+            parsed.get("required_command_gate", {}) if isinstance(parsed, dict) else {}
+        )
+        if status == "success" and not required_command_gate.get("passed", False):
+            status = "needs_review"
 
         retained = request.keep_worktree or self.config.repo_tasks.retain_worktrees
         result = {
@@ -191,6 +198,11 @@ class TaskRunner:
             "acceptance_notes": (
                 parsed.get("acceptance_notes", []) if isinstance(parsed, dict) else []
             ),
+            "commands_run": parsed.get("commands_run", []) if isinstance(parsed, dict) else [],
+            "command_results": (
+                parsed.get("command_results", {}) if isinstance(parsed, dict) else {}
+            ),
+            "required_command_gate": required_command_gate,
             "worker_error": worker_error,
             "metrics": (worker_response or {}).get("forgehand"),
             "review_required": True,
@@ -229,6 +241,7 @@ class TaskRunner:
                         "worker_summary": result.get("worker_summary"),
                         "confidence": result.get("confidence"),
                         "uncertainties": result.get("uncertainties", []),
+                        "required_command_gate": result.get("required_command_gate", {}),
                         "metrics": {
                             key: metrics.get(key)
                             for key in (

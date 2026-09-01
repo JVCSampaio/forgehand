@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from forgehand.config import RepositorySettings, load_config
-from forgehand.models import TaskRequest
+from forgehand.models import RepoCommand, TaskRequest
 from forgehand.tasks import TaskRunner
 
 
@@ -45,9 +46,26 @@ def test_live_local_worker(tmp_path: Path) -> None:
             objective="Replace the complete contents of value.txt with after and a newline.",
             scope=["value.txt"],
             acceptance_criteria=["value.txt contains exactly after and a newline."],
+            commands=[
+                RepoCommand(
+                    command_id="verify-value",
+                    argv=[
+                        sys.executable,
+                        "-c",
+                        (
+                            "from pathlib import Path; "
+                            "ok = Path('value.txt').read_text() == 'after\\n'; "
+                            "raise SystemExit(0 if ok else 1)"
+                        ),
+                    ],
+                )
+            ],
+            required_command_ids=["verify-value"],
+            acknowledge_host_command_risk=True,
             max_iterations=10,
             keep_worktree=False,
         )
     )
     assert result["status"] == "success", result
     assert result["changed_files"] == ["value.txt"]
+    assert result["required_command_gate"]["passed"] is True

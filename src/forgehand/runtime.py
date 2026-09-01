@@ -73,6 +73,13 @@ class ForgehandRuntime:
                     }
                     for command in request.commands
                 ],
+                "required_command_ids": request.required_command_ids,
+                "command_security": {
+                    "shell": False,
+                    "os_level_sandbox": False,
+                    "host_network_inherited": True,
+                    "host_os_permissions_inherited": True,
+                },
                 "source_revision": source_revision,
             },
             "state_revision": revision,
@@ -121,6 +128,12 @@ class ForgehandRuntime:
                 "The latest file observation is complete and current. Do not read that file "
                 "again unless the repository changes. Compare it with the task contract; "
                 "complete now if satisfied, otherwise edit or run an approved check."
+            )
+        elif action_type == "read_files":
+            intent = (
+                "Use the current bounded batch observation. Do not reread complete files while "
+                "the repository is unchanged. Read only truncated continuations if necessary, "
+                "then complete or take the specific next action required by the contract."
             )
         elif action_type in {"replace_text", "write_file", "create_file"}:
             intent = (
@@ -241,6 +254,7 @@ class ForgehandRuntime:
                     started,
                     invalid_attempts,
                     f"structured worker decision failed: {validation_error}",
+                    executor=executor,
                 )
 
             try:
@@ -295,6 +309,8 @@ class ForgehandRuntime:
                         "summary": completion["summary"],
                         "changed_files": facts["changed_files"],
                         "commands_run": sorted(executor.command_results),
+                        "command_results": executor.command_evidence(),
+                        "required_command_gate": executor.required_command_gate(),
                         "confidence": result.decision.confidence,
                         "uncertainties": completion["uncertainties"],
                         "acceptance_notes": completion["acceptance_notes"],
@@ -308,6 +324,7 @@ class ForgehandRuntime:
             started,
             invalid_attempts,
             f"Forgehand reached the {maximum_steps}-step budget",
+            executor=executor,
         )
 
     def _blocked(
@@ -316,6 +333,8 @@ class ForgehandRuntime:
         started: float,
         invalid_attempts: int,
         message: str,
+        *,
+        executor: ForgehandExecutor | None = None,
     ) -> dict[str, Any]:
         metrics = store.metrics()
         metrics.update(
@@ -331,7 +350,18 @@ class ForgehandRuntime:
                 "status": "blocked",
                 "summary": message[:2000],
                 "changed_files": [],
-                "commands_run": [],
+                "commands_run": sorted(executor.command_results) if executor else [],
+                "command_results": executor.command_evidence() if executor else {},
+                "required_command_gate": (
+                    executor.required_command_gate()
+                    if executor
+                    else {
+                        "required_command_ids": [],
+                        "missing_command_ids": [],
+                        "failed_command_ids": [],
+                        "passed": True,
+                    }
+                ),
                 "confidence": 0.0,
                 "uncertainties": [message[:500]],
                 "acceptance_notes": [],

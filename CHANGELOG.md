@@ -3,6 +3,17 @@
 All notable changes will be documented here. Forgehand follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.0 - 2026-09-01
+
+- Added deterministic required-command gates: `success` is impossible until every
+  required command has run and exited zero.
+- Required explicit acknowledgement that approved commands inherit host permissions
+  and network access.
+- Added compact command evidence and gate state to task receipts.
+- Added bounded multi-file reads to reduce repeated contract and inference overhead.
+- Expanded command-environment credential scrubbing and disabled interactive Git prompts.
+- Corrected MCP open-world and security metadata to state that no OS sandbox exists.
+
 ## 0.1.1 - 2026-09-01
 
 - Reduced repeated observation actions for smaller local workers.

@@ -81,6 +81,7 @@ class WorkerAction(BaseModel):
         "complete",
         "list_files",
         "read_file",
+        "read_files",
         "search_text",
         "replace_text",
         "write_file",
@@ -138,6 +139,8 @@ class TaskRequest(BaseModel):
     constraints: list[str] = Field(default_factory=list, max_length=100)
     acceptance_criteria: list[str] = Field(min_length=1, max_length=100)
     commands: list[RepoCommand] = Field(default_factory=list, max_length=20)
+    required_command_ids: list[str] = Field(default_factory=list, max_length=20)
+    acknowledge_host_command_risk: bool = False
     base_revision: str = Field(default="HEAD", min_length=1, max_length=200)
     max_iterations: int = Field(default=10, ge=1, le=100)
     keep_worktree: bool = True
@@ -150,6 +153,8 @@ class TaskRequest(BaseModel):
             candidate = value.strip().replace("\\", "/").strip("/")
             if not candidate or candidate == "." or ".." in candidate.split("/"):
                 raise ValueError("scope entries must be repository-relative paths")
+            if len(candidate) > 500:
+                raise ValueError("scope entries must not exceed 500 characters")
             normalized.append(candidate)
         return list(dict.fromkeys(normalized))
 
@@ -158,6 +163,18 @@ class TaskRequest(BaseModel):
         command_ids = [command.command_id for command in self.commands]
         if len(command_ids) != len(set(command_ids)):
             raise ValueError("command_id values must be unique")
+        if len(self.required_command_ids) != len(set(self.required_command_ids)):
+            raise ValueError("required_command_ids values must be unique")
+        unknown = sorted(set(self.required_command_ids) - set(command_ids))
+        if unknown:
+            raise ValueError(
+                "required_command_ids must reference declared commands: " + ", ".join(unknown)
+            )
+        if self.commands and not self.acknowledge_host_command_risk:
+            raise ValueError(
+                "commands inherit host OS permissions and network access; set "
+                "acknowledge_host_command_risk=true after reviewing every argv"
+            )
         return self
 
 

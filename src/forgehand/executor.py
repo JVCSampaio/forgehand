@@ -14,7 +14,9 @@ from forgehand.config import ForgehandConfig
 from forgehand.models import ArtifactRef, TaskRequest, WorkerAction
 
 SENSITIVE_ENV_NAME = re.compile(
-    r"(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH|COOKIE|BEARER|PRIVATE[_-]?KEY)",
+    r"(?:API[_-]?KEY|ACCESS[_-]?KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH|COOKIE|"
+    r"BEARER|PRIVATE[_-]?KEY|PROXY|SSH_AUTH_SOCK|AWS_|AZURE_|GOOGLE_APPLICATION_|"
+    r"GITHUB_|GH_|DOCKER_AUTH)",
     re.IGNORECASE,
 )
 
@@ -80,6 +82,8 @@ class ForgehandExecutor:
             return self.checkout
         if not raw or raw == "." or ".." in raw.split("/"):
             raise ValueError("path must be repository-relative")
+        if len(raw) > 500:
+            raise ValueError("path must not exceed 500 characters")
         target = (self.checkout / raw).resolve()
         if self.checkout not in target.parents:
             raise PermissionError("path escapes the isolated worktree")
@@ -159,6 +163,19 @@ class ForgehandExecutor:
                     f"{relative} was already read completely and the repository is unchanged; "
                     "do not read it again—complete, run an approved check, or choose new work"
                 )
+        if action.type == "read_files" and isinstance(arguments.get("paths"), list):
+            repeated = [
+                path
+                for path in arguments["paths"]
+                if isinstance(path, str)
+                and self._complete_reads.get(path.replace("\\", "/").strip("/"))
+                == self._repository_generation
+            ]
+            if repeated:
+                raise ValueError(
+                    "files were already read completely and the repository is unchanged: "
+                    + ", ".join(repeated)
+                )
         handler = getattr(self, f"_action_{action.type}", None)
         if handler is None:  # pragma: no cover - guarded by the schema
             raise ValueError(f"unsupported action: {action.type}")
@@ -169,6 +186,10 @@ class ForgehandExecutor:
             and result.get("offset_chars") == 0
         ):
             self._complete_reads[str(result["path"])] = self._repository_generation
+        if action.type == "read_files":
+            for item in result.get("files", []):
+                if not item.get("truncated"):
+                    self._complete_reads[str(item["path"])] = self._repository_generation
         if action.type in {"replace_text", "write_file", "create_file", "run_command"}:
             self._repository_generation += 1
         artifact = self._artifact(step, action.type, result)
@@ -231,6 +252,57 @@ class ForgehandExecutor:
             "truncated": offset + len(chunk) < len(text),
             "sha256": self._hash(path),
             "summary": f"Read {len(chunk)} characters from {relative}",
+        }
+
+    def _action_read_files(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        paths = arguments.get("paths")
+        if (
+            not isinstance(paths, list)
+            or not 1 <= len(paths) <= 8
+            or not all(isinstance(path, str) for path in paths)
+        ):
+            raise ValueError("paths must be a list of 1 to 8 repository-relative strings")
+        normalized_paths = [path.replace("\\", "/").strip("/") for path in paths]
+        if len(normalized_paths) != len(set(normalized_paths)):
+            raise ValueError("paths must not contain duplicates")
+        maximum_each = max(
+            1,
+            self._integer(
+                arguments,
+                "max_chars_each",
+                min(4_000, self.config.repo_tasks.max_file_chars),
+                self.config.repo_tasks.max_file_chars,
+            ),
+        )
+        # Reserve enough room for eight bounded paths, hashes, and JSON framing.
+        remaining = max(1_000, self.config.forgehand.max_observation_chars - 6_000)
+        files: list[dict[str, Any]] = []
+        for value in normalized_paths:
+            path = self._resolve(value)
+            if not path.is_file():
+                raise IsADirectoryError(path)
+            text = path.read_text(encoding="utf-8")
+            take = min(maximum_each, remaining)
+            chunk = text[:take]
+            relative = path.relative_to(self.checkout).as_posix()
+            files.append(
+                {
+                    "path": relative,
+                    "text": chunk,
+                    "next_offset_chars": len(chunk),
+                    "truncated": len(chunk) < len(text),
+                    "sha256": self._hash(path),
+                }
+            )
+            remaining -= len(chunk)
+            if remaining <= 0:
+                break
+        return {
+            "files": files,
+            "requested_file_count": len(paths),
+            "returned_file_count": len(files),
+            "observation_budget_exhausted": len(files) < len(paths),
+            "summary": f"Read {len(files)} of {len(paths)} requested file(s)",
         }
 
     def _action_search_text(self, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -362,6 +434,14 @@ class ForgehandExecutor:
         for name in list(environment):
             if SENSITIVE_ENV_NAME.search(name):
                 environment.pop(name, None)
+        environment.update(
+            {
+                "GIT_TERMINAL_PROMPT": "0",
+                "GCM_INTERACTIVE": "Never",
+                "GIT_ASKPASS": "",
+                "SSH_ASKPASS": "",
+            }
+        )
         started = time.monotonic()
         completed = subprocess.run(
             command.argv,
@@ -389,6 +469,31 @@ class ForgehandExecutor:
         }
         self.command_results[command_id] = result
         return result
+
+    def command_evidence(self) -> dict[str, dict[str, Any]]:
+        return {
+            command_id: {
+                "exit_code": result["exit_code"],
+                "runtime_seconds": result["runtime_seconds"],
+            }
+            for command_id, result in self.command_results.items()
+        }
+
+    def required_command_gate(self) -> dict[str, Any]:
+        required = self.request.required_command_ids
+        missing = [command_id for command_id in required if command_id not in self.command_results]
+        failed = [
+            command_id
+            for command_id in required
+            if command_id in self.command_results
+            and self.command_results[command_id]["exit_code"] != 0
+        ]
+        return {
+            "required_command_ids": required,
+            "missing_command_ids": missing,
+            "failed_command_ids": failed,
+            "passed": not missing and not failed,
+        }
 
     def _action_inspect_diff(self, arguments: dict[str, Any]) -> dict[str, Any]:
         maximum = max(
@@ -419,6 +524,16 @@ class ForgehandExecutor:
             status = "success"
         if status not in {"success", "partial", "needs_review", "blocked"}:
             raise ValueError("completion status is invalid")
+        gate = self.required_command_gate()
+        if status == "success" and not gate["passed"]:
+            problems = []
+            if gate["missing_command_ids"]:
+                problems.append("not run: " + ", ".join(gate["missing_command_ids"]))
+            if gate["failed_command_ids"]:
+                problems.append("failed: " + ", ".join(gate["failed_command_ids"]))
+            raise ValueError(
+                "success requires passing required commands (" + "; ".join(problems) + ")"
+            )
         summary = arguments.get("summary")
         if not isinstance(summary, str) or not summary.strip() or len(summary) > 2000:
             raise ValueError("completion summary must contain 1 to 2000 characters")
@@ -453,11 +568,14 @@ class ForgehandExecutor:
             "changed_files": changed,
             "changed_file_count": len(changed),
             "approved_command_ids": sorted(self.commands),
-            "command_results": {
-                key: {
-                    "exit_code": value["exit_code"],
-                    "runtime_seconds": value["runtime_seconds"],
-                }
-                for key, value in self.command_results.items()
+            "required_command_gate": self.required_command_gate(),
+            "command_security": {
+                "shell": False,
+                "os_level_sandbox": False,
+                "host_network_inherited": True,
+                "host_os_permissions_inherited": True,
+                "sensitive_environment_removed": True,
+                "host_risk_acknowledged": self.request.acknowledge_host_command_risk,
             },
+            "command_results": self.command_evidence(),
         }

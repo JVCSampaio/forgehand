@@ -26,7 +26,8 @@ its MCP inventory.
 
 Ask Codex to send a complete task rather than individual file operations. Every
 contract should include exact mutable scope, constraints, acceptance criteria,
-approved validation commands, and a step budget.
+approved validation commands, required command IDs, explicit acknowledgement of
+host command risk, and a step budget.
 
 After completion, Codex should inspect the patch, review architecture-sensitive
 changes, and rerun critical tests. A worker `success` field is not approval.

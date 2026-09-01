@@ -42,6 +42,7 @@ Actions and required arguments:
 - complete: {status, summary, uncertainties?, acceptance_notes?}
 - list_files: {path, limit?}
 - read_file: {path, max_chars?, offset_chars?}
+- read_files: {paths, max_chars_each?} (batch up to 8 files within one observation budget)
 - search_text: {path, query, limit?}
 - replace_text: {path, old_text, new_text, expected_replacements?}
 - write_file: {path, content} (replace the complete file, or create it)

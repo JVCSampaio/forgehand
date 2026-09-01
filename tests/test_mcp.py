@@ -40,3 +40,5 @@ async def test_stdio_mcp_handshake(tmp_path: Path) -> None:
     assert health.structuredContent is not None
     assert health.structuredContent["ok"] is True
     assert health.structuredContent["security"]["final_review_required"] is True
+    assert health.structuredContent["security"]["required_command_success_gate"] is True
+    assert health.structuredContent["security"]["os_level_command_sandbox"] is False
