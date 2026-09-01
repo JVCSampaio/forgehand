@@ -359,6 +359,7 @@ def test_blocked_receipt_preserves_failed_required_command_evidence(tmp_path: Pa
     assert result["commands_run"] == ["validate"]
     assert result["command_results"]["validate"]["exit_code"] == 9
     assert result["required_command_gate"] == {
+        "enforced": True,
         "required_command_ids": ["validate"],
         "missing_command_ids": [],
         "failed_command_ids": ["validate"],

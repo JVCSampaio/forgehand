@@ -356,6 +356,7 @@ class ForgehandRuntime:
                     executor.required_command_gate()
                     if executor
                     else {
+                        "enforced": True,
                         "required_command_ids": [],
                         "missing_command_ids": [],
                         "failed_command_ids": [],

@@ -489,6 +489,7 @@ class ForgehandExecutor:
             and self.command_results[command_id]["exit_code"] != 0
         ]
         return {
+            "enforced": True,
             "required_command_ids": required,
             "missing_command_ids": missing,
             "failed_command_ids": failed,

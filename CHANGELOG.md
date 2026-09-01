@@ -3,6 +3,11 @@
 All notable changes will be documented here. Forgehand follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.1 - 2026-09-01
+
+- Made deterministic gate enforcement explicit in runtime facts and receipts so small
+  workers do not confuse an empty per-task requirement list with an absent capability.
+
 ## 0.2.0 - 2026-09-01
 
 - Added deterministic required-command gates: `success` is impossible until every
