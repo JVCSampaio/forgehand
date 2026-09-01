@@ -113,6 +113,34 @@ class ForgehandRuntime:
         payload["artifact_refs"] = refs[-20:]
         return AgentState.model_validate(payload)
 
+    @staticmethod
+    def _with_runtime_intent(state: AgentState, action_result: dict[str, Any]) -> AgentState:
+        action_type = action_result["action_type"]
+        if action_type == "read_file" and not action_result["result"].get("truncated"):
+            intent = (
+                "The latest file observation is complete and current. Do not read that file "
+                "again unless the repository changes. Compare it with the task contract; "
+                "complete now if satisfied, otherwise edit or run an approved check."
+            )
+        elif action_type in {"replace_text", "write_file", "create_file"}:
+            intent = (
+                "The repository changed. Validate it once with a distinct read, diff, or "
+                "approved command, then complete when the acceptance criteria are satisfied."
+            )
+        elif action_type == "run_command":
+            intent = (
+                "Use the latest approved command result. Complete if it proves the acceptance "
+                "criteria; otherwise fix the observed failure without repeating the same check."
+            )
+        elif action_type == "inspect_diff":
+            intent = (
+                "The current diff has been inspected. Complete if it satisfies the task "
+                "contract; otherwise make the specific remaining change."
+            )
+        else:
+            return state
+        return state.model_copy(update={"next_intent": intent})
+
     def run(
         self,
         request: TaskRequest,
@@ -218,6 +246,7 @@ class ForgehandRuntime:
             try:
                 action_result = executor.execute(step, result.decision.action)
                 candidate = self._with_artifact(candidate, action_result["artifact"])
+                candidate = self._with_runtime_intent(candidate, action_result)
             except Exception as exc:
                 invalid_attempts += 1
                 observation = f"ACTION_REJECTED: {type(exc).__name__}: {exc}"[

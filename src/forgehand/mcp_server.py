@@ -87,7 +87,7 @@ def forgehand_delegate(
     constraints: list[str] | None = None,
     commands: list[RepoCommand] | None = None,
     base_revision: str = "HEAD",
-    max_iterations: int = 8,
+    max_iterations: int = 10,
     keep_worktree: bool = True,
 ) -> dict[str, Any]:
     """Run one complete implementation task with bounded files and commands.

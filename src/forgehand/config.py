@@ -48,6 +48,8 @@ class RuntimeSettings(BaseModel):
     max_observation_chars: int = Field(12_000, ge=1_000, le=100_000)
     max_context_chars: int = Field(32_000, ge=4_000, le=200_000)
     max_output_tokens: int = Field(1_400, ge=256, le=8_192)
+    temperature: float = Field(0.6, ge=0, le=2)
+    top_p: float = Field(0.95, gt=0, le=1)
     reasoning_effort: str = Field("none", pattern=r"^(none|minimal|low|medium|high)$")
     inference_timeout_seconds: int = Field(240, ge=10, le=1_200)
     invalid_output_retries: int = Field(2, ge=0, le=5)

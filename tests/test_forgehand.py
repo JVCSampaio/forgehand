@@ -184,6 +184,7 @@ def test_stateless_bounded_task_loop(tmp_path: Path) -> None:
     assert all("history" not in context for context in inference.contexts)
     assert "before" in json.dumps(inference.contexts[2])
     assert "before" not in json.dumps(inference.contexts[3])
+    assert "Do not read that file again" in inference.contexts[2]["current_state"]["next_intent"]
 
 
 def test_scope_root_discovery_reads_only_declared_scope(tmp_path: Path) -> None:
@@ -216,7 +217,7 @@ def test_completion_normalizes_single_notes_without_another_model_call(tmp_path:
         WorkerAction(
             type="complete",
             arguments={
-                "status": "success",
+                "status": "completed",
                 "summary": "Done",
                 "uncertainties": "None",
                 "acceptance_notes": "The requested content is present.",
@@ -225,7 +226,55 @@ def test_completion_normalizes_single_notes_without_another_model_call(tmp_path:
     )
 
     assert completed["result"]["uncertainties"] == ["None"]
+    assert completed["result"]["status"] == "success"
     assert completed["result"]["acceptance_notes"] == ["The requested content is present."]
+
+
+def test_numeric_action_arguments_accept_json_digit_strings(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    executor = ForgehandExecutor(
+        _config(tmp_path, repository),
+        _request(repository),
+        checkout=repository,
+        task_root=tmp_path / "task",
+    )
+
+    read = executor.execute(
+        1,
+        WorkerAction(
+            type="read_file",
+            arguments={"path": "src/value.txt", "max_chars": "7"},
+        ),
+    )
+
+    assert read["result"]["text"] == "before\n"
+    assert '"action":"read_file"' in read["observation"]
+
+    with pytest.raises(ValueError, match="already read completely"):
+        executor.execute(
+            2,
+            WorkerAction(
+                type="read_file",
+                arguments={"path": "src/value.txt", "max_chars": 100},
+            ),
+        )
+
+    executor.execute(
+        3,
+        WorkerAction(
+            type="replace_text",
+            arguments={
+                "path": "src/value.txt",
+                "old_text": "before",
+                "new_text": "after",
+            },
+        ),
+    )
+    reread = executor.execute(
+        4,
+        WorkerAction(type="read_file", arguments={"path": "src/value.txt"}),
+    )
+    assert reread["result"]["text"] == "after\n"
 
 
 def test_billed_invalid_response_is_counted(tmp_path: Path) -> None:

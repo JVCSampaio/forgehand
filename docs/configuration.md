@@ -31,6 +31,8 @@ forgehand:
   max_observation_chars: 12000
   max_context_chars: 32000
   max_output_tokens: 1400
+  temperature: 0.6
+  top_p: 0.95
   reasoning_effort: none
   inference_timeout_seconds: 240
   invalid_output_retries: 2

@@ -56,6 +56,8 @@ class ForgehandExecutor:
         self.artifact_dir.mkdir(parents=True, exist_ok=True)
         self.commands = {command.command_id: command for command in request.commands}
         self.command_results: dict[str, dict[str, Any]] = {}
+        self._repository_generation = 0
+        self._complete_reads: dict[str, int] = {}
 
     def _in_scope(self, relative: str) -> bool:
         normalized = relative.replace("\\", "/").strip("/")
@@ -116,6 +118,8 @@ class ForgehandExecutor:
     @staticmethod
     def _integer(arguments: dict[str, Any], key: str, default: int, maximum: int) -> int:
         value = arguments.get(key, default)
+        if isinstance(value, str) and value.isascii() and value.isdecimal():
+            value = int(value)
         if not isinstance(value, int):
             raise ValueError(f"{key} must be an integer")
         return max(0, min(value, maximum))
@@ -147,12 +151,32 @@ class ForgehandExecutor:
         arguments = action.arguments
         if not isinstance(arguments, dict):
             raise ValueError("action arguments must be an object")
+        if action.type == "read_file" and isinstance(arguments.get("path"), str):
+            target = self._resolve(arguments["path"])
+            relative = target.relative_to(self.checkout).as_posix()
+            if self._complete_reads.get(relative) == self._repository_generation:
+                raise ValueError(
+                    f"{relative} was already read completely and the repository is unchanged; "
+                    "do not read it again—complete, run an approved check, or choose new work"
+                )
         handler = getattr(self, f"_action_{action.type}", None)
         if handler is None:  # pragma: no cover - guarded by the schema
             raise ValueError(f"unsupported action: {action.type}")
         result = handler(arguments)
+        if (
+            action.type == "read_file"
+            and not result.get("truncated")
+            and result.get("offset_chars") == 0
+        ):
+            self._complete_reads[str(result["path"])] = self._repository_generation
+        if action.type in {"replace_text", "write_file", "create_file", "run_command"}:
+            self._repository_generation += 1
         artifact = self._artifact(step, action.type, result)
-        observation = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+        observation = json.dumps(
+            {"action": action.type, "result": result},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
         return {
             "action_type": action.type,
             "result": result,
@@ -391,6 +415,8 @@ class ForgehandExecutor:
 
     def _action_complete(self, arguments: dict[str, Any]) -> dict[str, Any]:
         status = arguments.get("status")
+        if status in {"completed", "done"}:
+            status = "success"
         if status not in {"success", "partial", "needs_review", "blocked"}:
             raise ValueError("completion status is invalid")
         summary = arguments.get("summary")

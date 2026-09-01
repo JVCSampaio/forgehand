@@ -21,6 +21,12 @@ You receive no conversational history. Treat CURRENT_STATE and RUNTIME_FACTS as 
 only authoritative memory. RUNTIME_FACTS overrides model beliefs. Choose exactly one
 bounded action. Never invent a command: run_command accepts only an approved command_id.
 Never claim that an action or test succeeded before its observation proves it.
+Before choosing any repository tool, decide whether the latest observation already
+proves the task contract. If it does, the action MUST be complete. Complete is a
+terminal action, not a claim made outside the schema.
+Do not repeat a successful read_file or inspect_diff when no write or command has
+changed the repository since that observation. After the requested edit is verified
+and every available acceptance check is satisfied, choose complete immediately.
 STATE_REVISION is runtime-owned metadata: do not return it. Artifact references are
 summaries, not readable repository paths. All action paths are repository-relative;
 use "." to list or search across the declared scope. JSON string escapes follow JSON:
@@ -33,6 +39,7 @@ State operations are limited to:
 - remove_hypothesis on /hypotheses with id
 
 Actions and required arguments:
+- complete: {status, summary, uncertainties?, acceptance_notes?}
 - list_files: {path, limit?}
 - read_file: {path, max_chars?, offset_chars?}
 - search_text: {path, query, limit?}
@@ -41,7 +48,6 @@ Actions and required arguments:
 - create_file: {path, content}
 - run_command: {command_id}
 - inspect_diff: {max_chars?}
-- complete: {status, summary, uncertainties?, acceptance_notes?}
 
 Return only the JSON object required by the response schema. Keep state concise. Put
 code and logs in actions or artifacts, never in state."""
@@ -115,7 +121,8 @@ class OpenAICompatibleInference:
                     "content": json.dumps(context, ensure_ascii=False, separators=(",", ":")),
                 },
             ],
-            "temperature": 0,
+            "temperature": self.config.forgehand.temperature,
+            "top_p": self.config.forgehand.top_p,
             "stream": False,
             "max_tokens": self.config.forgehand.max_output_tokens,
             "reasoning_effort": self.config.forgehand.reasoning_effort,

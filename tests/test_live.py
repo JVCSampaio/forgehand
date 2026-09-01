@@ -45,7 +45,7 @@ def test_live_local_worker(tmp_path: Path) -> None:
             objective="Replace the complete contents of value.txt with after and a newline.",
             scope=["value.txt"],
             acceptance_criteria=["value.txt contains exactly after and a newline."],
-            max_iterations=8,
+            max_iterations=10,
             keep_worktree=False,
         )
     )

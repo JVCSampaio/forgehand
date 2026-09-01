@@ -78,6 +78,7 @@ class WorkerAction(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal[
+        "complete",
         "list_files",
         "read_file",
         "search_text",
@@ -86,7 +87,6 @@ class WorkerAction(BaseModel):
         "create_file",
         "run_command",
         "inspect_diff",
-        "complete",
     ]
     arguments: dict[str, Any] = Field(default_factory=dict)
 
@@ -139,7 +139,7 @@ class TaskRequest(BaseModel):
     acceptance_criteria: list[str] = Field(min_length=1, max_length=100)
     commands: list[RepoCommand] = Field(default_factory=list, max_length=20)
     base_revision: str = Field(default="HEAD", min_length=1, max_length=200)
-    max_iterations: int = Field(default=8, ge=1, le=100)
+    max_iterations: int = Field(default=10, ge=1, le=100)
     keep_worktree: bool = True
 
     @field_validator("scope")
