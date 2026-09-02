@@ -244,7 +244,7 @@ class ForgehandExecutor:
         if handler is None:  # pragma: no cover - guarded by the schema
             raise ValueError(f"unsupported action: {action.type}")
         result = handler(arguments)
-        if action.type in {"replace_text", "write_file", "create_file"}:
+        if action.type in {"replace_text", "write_file", "create_file", "apply_patch"}:
             self._has_edit = True
         if action.type == "run_command":
             self._last_repeatable_action = (
@@ -261,7 +261,13 @@ class ForgehandExecutor:
             for item in result.get("files", []):
                 if not item.get("truncated"):
                     self._complete_reads[str(item["path"])] = self._repository_generation
-        if action.type in {"replace_text", "write_file", "create_file", "run_command"}:
+        if action.type in {
+            "replace_text",
+            "write_file",
+            "create_file",
+            "apply_patch",
+            "run_command",
+        }:
             self._repository_generation += 1
         artifact = self._artifact(step, action.type, result)
         observation = json.dumps(
@@ -542,6 +548,71 @@ class ForgehandExecutor:
         self.command_results[command_id] = result
         return result
 
+    def _action_apply_patch(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        patch = arguments.get("patch")
+        if not isinstance(patch, str) or not patch.strip():
+            raise ValueError("patch must be a non-empty unified diff")
+        if len(patch) > self.config.repo_tasks.max_file_chars:
+            raise ValueError("patch exceeds the configured size limit")
+        touched: list[str] = []
+        for line in patch.splitlines():
+            if line.startswith("+++ b/") or line.startswith("--- a/"):
+                relative = line[6:].strip()
+                if relative == "/dev/null":
+                    continue
+                if relative.startswith("a/") or relative.startswith("b/"):
+                    relative = relative[2:]
+                relative = relative.replace("\\", "/")
+                if ".." in relative.split("/") or not self._in_scope(relative):
+                    raise PermissionError(f"patch touches path outside declared scope: {relative}")
+                touched.append(relative)
+        if not touched:
+            raise ValueError("patch does not contain a scoped file header")
+        patch_file = self.artifact_dir / ".pending.patch"
+        patch_file.write_text(patch, encoding="utf-8", newline="")
+        environment = dict(os.environ)
+        for name in list(environment):
+            if SENSITIVE_ENV_NAME.search(name):
+                environment.pop(name, None)
+        checked = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(self.checkout),
+                "apply",
+                "--check",
+                "--whitespace=nowarn",
+                str(patch_file),
+            ],
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+            check=False,
+        )
+        if checked.returncode:
+            raise ValueError((checked.stderr or checked.stdout).strip()[-2000:])
+        applied = subprocess.run(
+            ["git", "-C", str(self.checkout), "apply", "--whitespace=nowarn", str(patch_file)],
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+            check=False,
+        )
+        if applied.returncode:
+            raise ValueError((applied.stderr or applied.stdout).strip()[-2000:])
+        return {
+            "changed_files": sorted(set(touched)),
+            "summary": f"Applied patch to {len(set(touched))} scoped file(s)",
+        }
+
     def command_evidence(self) -> dict[str, dict[str, Any]]:
         return {
             command_id: {
@@ -674,6 +745,7 @@ class ForgehandExecutor:
                     "replace_text",
                     "write_file",
                     "create_file",
+                    "apply_patch",
                     "inspect_diff",
                 ]
                 if not self.command_results:
@@ -688,6 +760,7 @@ class ForgehandExecutor:
                 "replace_text",
                 "write_file",
                 "create_file",
+                "apply_patch",
                 "run_command",
                 "inspect_diff",
             ]

@@ -269,8 +269,9 @@ class ForgehandRuntime:
                 # For implementation tasks, validation is a runtime concern:
                 # execute declared required checks immediately after an edit so
                 # the worker only receives a compact pass/fail observation.
+                edit_actions = {"replace_text", "write_file", "create_file", "apply_patch"}
                 if (
-                    result.decision.action.type in {"replace_text", "write_file", "create_file"}
+                    result.decision.action.type in edit_actions
                     and request.requires_changes
                     and request.required_command_ids
                 ):
@@ -304,10 +305,7 @@ class ForgehandRuntime:
                 after_tree = executor._repository_fingerprint()
                 if result.decision.action.type == "inspect_diff":
                     no_progress_steps += 1
-                elif (
-                    result.decision.action.type in {"replace_text", "write_file", "create_file"}
-                    or before_tree != after_tree
-                ):
+                elif result.decision.action.type in edit_actions or before_tree != after_tree:
                     no_progress_steps = 0
                 if no_progress_steps >= self.config.forgehand.max_no_progress_steps:
                     return self._blocked(

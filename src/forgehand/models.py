@@ -86,6 +86,7 @@ class WorkerAction(BaseModel):
         "replace_text",
         "write_file",
         "create_file",
+        "apply_patch",
         "run_command",
         "inspect_diff",
     ]

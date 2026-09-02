@@ -62,6 +62,7 @@ Efficiency rules:
 - replace_text: {path, old_text, new_text, expected_replacements?}
 - write_file: {path, content} (replace the complete file, or create it)
 - create_file: {path, content}
+- apply_patch: {patch} (a unified diff touching only declared files)
 - run_command: {command_id}
 - inspect_diff: {max_chars?}
 
