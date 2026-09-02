@@ -328,7 +328,9 @@ class ForgehandRuntime:
                     )
             except Exception as exc:
                 invalid_attempts += 1
-                action_rejections += 1
+                redundant_observation = "already read completely" in str(exc)
+                if not redundant_observation:
+                    action_rejections += 1
                 observation = f"ACTION_REJECTED: {type(exc).__name__}: {exc}"[
                     : self.config.forgehand.max_observation_chars
                 ]
