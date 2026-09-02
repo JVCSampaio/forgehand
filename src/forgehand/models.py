@@ -11,6 +11,8 @@ Phase = Literal[
     "implementing",
     "validating",
     "debugging",
+    "inspect_then_edit",
+    "validate_or_complete",
     "completed",
     "blocked",
 ]
