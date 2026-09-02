@@ -93,7 +93,14 @@ class ForgehandExecutor:
             raise PermissionError("path escapes the isolated worktree")
         relative = target.relative_to(self.checkout).as_posix()
         if not self._in_scope(relative):
-            raise PermissionError(f"path is outside declared scope: {relative}")
+            aliases = [
+                item for item in self.request.scope if raw == item or raw.endswith("/" + item)
+            ]
+            if len(aliases) == 1:
+                target = (self.checkout / aliases[0]).resolve()
+                relative = aliases[0]
+            else:
+                raise PermissionError(f"path is outside declared scope: {relative}")
         if must_exist and not target.exists():
             raise FileNotFoundError(relative)
         return target

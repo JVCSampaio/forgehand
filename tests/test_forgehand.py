@@ -481,6 +481,23 @@ def test_repeated_command_on_unchanged_tree_is_rejected(tmp_path: Path) -> None:
         executor.execute(2, WorkerAction(type="run_command", arguments={"command_id": "validate"}))
 
 
+def test_unique_scoped_path_alias_is_normalized(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    request = TaskRequest(
+        repository_root=str(repository),
+        objective="Read the scoped file.",
+        scope=["src/value.txt"],
+        acceptance_criteria=["The file can be inspected."],
+    )
+    executor = ForgehandExecutor(
+        _config(tmp_path, repository), request, checkout=repository, task_root=tmp_path / "task"
+    )
+    result = executor.execute(
+        1, WorkerAction(type="read_file", arguments={"path": "project/src/value.txt"})
+    )
+    assert result["result"]["path"] == "src/value.txt"
+
+
 def test_requires_changes_blocks_empty_success(tmp_path: Path) -> None:
     repository = _repository(tmp_path)
     request = TaskRequest(

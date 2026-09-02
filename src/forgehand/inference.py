@@ -25,6 +25,8 @@ reads/searches, one optional baseline validation, or a scoped edit, while
 validate_or_complete permits repair or completion. The runtime validates automatically
 after each edit; do not request validation repeatedly.
 Only choose an action listed in RUNTIME_FACTS.allowed_action_types.
+Use paths exactly as listed in task_contract.scope; do not invent directory
+prefixes such as src/ when the declared scope contains a file at the repository root.
 Never claim that an action or test succeeded before its observation proves it.
 REQUIRED_COMMAND_GATE.enforced describes the runtime capability. An empty
 required_command_ids list means only that the current task has no required commands;
