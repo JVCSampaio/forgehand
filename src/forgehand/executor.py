@@ -662,10 +662,40 @@ class ForgehandExecutor:
     def runtime_facts(self, *, step: int, source_revision: str) -> dict[str, Any]:
         status = _git(self.checkout, "status", "--short")
         changed = [line[3:] for line in status.splitlines() if len(line) >= 4]
+        if self.request.requires_changes:
+            if self._has_edit:
+                allowed_actions = ["replace_text", "write_file", "create_file", "complete"]
+            else:
+                allowed_actions = [
+                    "list_files",
+                    "read_file",
+                    "read_files",
+                    "search_text",
+                    "replace_text",
+                    "write_file",
+                    "create_file",
+                    "inspect_diff",
+                ]
+                if not self.command_results:
+                    allowed_actions.append("run_command")
+        else:
+            allowed_actions = [
+                "complete",
+                "list_files",
+                "read_file",
+                "read_files",
+                "search_text",
+                "replace_text",
+                "write_file",
+                "create_file",
+                "run_command",
+                "inspect_diff",
+            ]
         return {
             "step": step,
             "workflow_phase": ("validate_or_complete" if self._has_edit else "inspect_then_edit"),
             "source_revision": source_revision,
+            "allowed_action_types": allowed_actions,
             "changed_files": changed,
             "changed_file_count": len(changed),
             "approved_command_ids": sorted(self.commands),
