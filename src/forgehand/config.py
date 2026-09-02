@@ -50,6 +50,7 @@ class RuntimeSettings(BaseModel):
     max_output_tokens: int = Field(1_400, ge=256, le=8_192)
     temperature: float = Field(0.6, ge=0, le=2)
     top_p: float = Field(0.95, gt=0, le=1)
+    seed: int | None = Field(default=None, ge=0, le=2_147_483_647)
     reasoning_effort: str = Field("none", pattern=r"^(none|minimal|low|medium|high)$")
     inference_timeout_seconds: int = Field(240, ge=10, le=1_200)
     invalid_output_retries: int = Field(2, ge=0, le=5)

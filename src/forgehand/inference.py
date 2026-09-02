@@ -142,6 +142,8 @@ class OpenAICompatibleInference:
             "max_tokens": self.config.forgehand.max_output_tokens,
             "reasoning_effort": self.config.forgehand.reasoning_effort,
         }
+        if self.config.forgehand.seed is not None:
+            payload["seed"] = self.config.forgehand.seed
         if schema:
             payload["response_format"] = {
                 "type": "json_schema",
