@@ -267,7 +267,10 @@ class ForgehandExecutor:
         if action.type == "read_file" and isinstance(arguments.get("path"), str):
             target = self._resolve(arguments["path"])
             relative = target.relative_to(self.checkout).as_posix()
-            if self._complete_reads.get(relative) == self._repository_generation:
+            if (
+                not self.recovery_mode
+                and self._complete_reads.get(relative) == self._repository_generation
+            ):
                 raise ValueError(
                     f"{relative} was already read completely and the repository is unchanged; "
                     "do not read it again—complete, run an approved check, or choose new work"
@@ -282,7 +285,7 @@ class ForgehandExecutor:
                 and self._complete_reads.get(path.replace("\\", "/").strip("/"))
                 == self._repository_generation
             ]
-            if repeated:
+            if repeated and not self.recovery_mode:
                 raise ValueError(
                     "files were already read completely and the repository is unchanged: "
                     + ", ".join(repeated)

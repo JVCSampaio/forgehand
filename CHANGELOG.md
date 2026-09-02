@@ -3,6 +3,12 @@
 All notable changes will be documented here. Forgehand follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.3.7 - 2026-09-02
+
+- Added deterministic Recovery Mode after consecutive rejected actions.
+- Recovery requires a bounded reread before allowing one constrained repair.
+- Added failure classification and compact recovery capsules to worker context.
+
 ## 0.3.6 - 2026-09-02
 
 - Added an explicit `repair` workflow phase after failed validation.
