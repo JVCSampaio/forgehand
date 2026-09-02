@@ -263,6 +263,41 @@ class ForgehandRuntime:
                 action_result = executor.execute(step, result.decision.action)
                 candidate = self._with_artifact(candidate, action_result["artifact"])
                 candidate = self._with_runtime_intent(candidate, action_result)
+
+                # For implementation tasks, validation is a runtime concern:
+                # execute declared required checks immediately after an edit so
+                # the worker only receives a compact pass/fail observation.
+                if (
+                    result.decision.action.type in {"replace_text", "write_file", "create_file"}
+                    and request.requires_changes
+                    and request.required_command_ids
+                ):
+                    validations = []
+                    for command_id in request.required_command_ids:
+                        validation = executor.execute(
+                            step,
+                            type(result.decision.action)(
+                                type="run_command",
+                                arguments={"command_id": command_id},
+                            ),
+                        )
+                        candidate = self._with_artifact(candidate, validation["artifact"])
+                        validations.append(validation["result"])
+                    action_result["observation"] = json.dumps(
+                        {
+                            "edit": json.loads(action_result["observation"]),
+                            "automatic_validation": [
+                                {
+                                    "command_id": item["command_id"],
+                                    "exit_code": item["exit_code"],
+                                    "output": item["output"],
+                                }
+                                for item in validations
+                            ],
+                        },
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
             except Exception as exc:
                 invalid_attempts += 1
                 action_rejections += 1

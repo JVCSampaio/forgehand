@@ -63,6 +63,7 @@ class ForgehandExecutor:
         self._repository_generation = 0
         self._complete_reads: dict[str, int] = {}
         self._last_repeatable_action: tuple[str, str] | None = None
+        self._has_edit = False
 
     def _in_scope(self, relative: str) -> bool:
         normalized = relative.replace("\\", "/").strip("/")
@@ -199,6 +200,8 @@ class ForgehandExecutor:
         arguments = action.arguments
         if not isinstance(arguments, dict):
             raise ValueError("action arguments must be an object")
+        if self.request.requires_changes and action.type == "run_command" and not self._has_edit:
+            raise ValueError("validation cannot run before the first scoped edit")
         if action.type == "run_command":
             current_tree_hash = self._repository_fingerprint()
             signature = json.dumps(
@@ -236,6 +239,8 @@ class ForgehandExecutor:
         if handler is None:  # pragma: no cover - guarded by the schema
             raise ValueError(f"unsupported action: {action.type}")
         result = handler(arguments)
+        if action.type in {"replace_text", "write_file", "create_file"}:
+            self._has_edit = True
         if action.type == "run_command":
             self._last_repeatable_action = (
                 signature,
@@ -609,6 +614,10 @@ class ForgehandExecutor:
             ]
             if not changed:
                 raise ValueError("success requires at least one changed file")
+            if not self.request.required_command_ids:
+                raise ValueError("success requires at least one required validation command")
+            if not self.command_results:
+                raise ValueError("success requires validation after the edit")
         if status == "success" and not gate["passed"]:
             problems = []
             if gate["missing_command_ids"]:
@@ -650,6 +659,7 @@ class ForgehandExecutor:
         changed = [line[3:] for line in status.splitlines() if len(line) >= 4]
         return {
             "step": step,
+            "workflow_phase": ("validate_or_complete" if self._has_edit else "inspect_then_edit"),
             "source_revision": source_revision,
             "changed_files": changed,
             "changed_file_count": len(changed),
