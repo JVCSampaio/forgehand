@@ -208,6 +208,8 @@ class ForgehandExecutor:
         if not isinstance(arguments, dict):
             raise ValueError("action arguments must be an object")
         if (
+            not internal
+            and
             self.request.allowed_actions is not None
             and action.type not in self.request.allowed_actions
         ):
