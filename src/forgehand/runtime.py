@@ -282,6 +282,7 @@ class ForgehandRuntime:
                                 type="run_command",
                                 arguments={"command_id": command_id},
                             ),
+                            internal=True,
                         )
                         candidate = self._with_artifact(candidate, validation["artifact"])
                         validations.append(validation["result"])

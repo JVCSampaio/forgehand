@@ -196,11 +196,11 @@ class ForgehandExecutor:
             summary=summary[:500],
         )
 
-    def execute(self, step: int, action: WorkerAction) -> dict[str, Any]:
+    def execute(self, step: int, action: WorkerAction, *, internal: bool = False) -> dict[str, Any]:
         arguments = action.arguments
         if not isinstance(arguments, dict):
             raise ValueError("action arguments must be an object")
-        if self.request.requires_changes:
+        if self.request.requires_changes and not internal:
             if not self._has_edit and action.type == "run_command":
                 raise ValueError("inspect_then_edit phase does not permit validation")
             if self._has_edit and action.type == "run_command":
