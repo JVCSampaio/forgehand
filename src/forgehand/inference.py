@@ -22,7 +22,8 @@ only authoritative memory. RUNTIME_FACTS overrides model beliefs. Choose exactly
 bounded action. Never invent a command: run_command accepts only an approved command_id.
 For requires_changes=true contracts, follow workflow_phase: inspect_then_edit permits
 reads/searches, one optional baseline validation, or a scoped edit, while
-validate_or_complete permits repair or completion. The runtime validates automatically
+validate_or_complete permits completion; repair permits edit_file or completion. The runtime
+validates automatically
 after each edit; do not request validation repeatedly.
 Only choose an action listed in RUNTIME_FACTS.allowed_action_types.
 Use paths exactly as listed in task_contract.scope; do not invent directory

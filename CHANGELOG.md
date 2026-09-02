@@ -3,6 +3,12 @@
 All notable changes will be documented here. Forgehand follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.3.6 - 2026-09-02
+
+- Added an explicit `repair` workflow phase after failed validation.
+- Compressed failed-command output into a bounded failure delta for worker context.
+- Included compact failure evidence in receipts and preserved deterministic tree validation.
+
 ## 0.2.3 - 2026-09-01
 
 - Accepted the common `complete` completion-status alias from small local models,

@@ -317,7 +317,7 @@ class ForgehandRuntime:
                                 {
                                     "command_id": item["command_id"],
                                     "exit_code": item["exit_code"],
-                                    "output": item["output"],
+                                    "failure_delta": item["failure_delta"],
                                 }
                                 for item in validations
                             ],

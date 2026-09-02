@@ -13,6 +13,7 @@ Phase = Literal[
     "debugging",
     "inspect_then_edit",
     "validate_or_complete",
+    "repair",
     "completed",
     "blocked",
 ]

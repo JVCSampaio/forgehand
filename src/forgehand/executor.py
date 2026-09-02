@@ -147,6 +147,17 @@ class ForgehandExecutor:
         return text[:head] + "\n... truncated ...\n" + text[-(limit - head) :], True
 
     @staticmethod
+    def _failure_delta(output: str, limit: int = 1400) -> dict[str, Any]:
+        """Return a small, actionable failure summary instead of replaying logs."""
+        lines = output.splitlines()
+        failures = [line.strip() for line in lines if "FAILED" in line or "ERROR" in line]
+        frames = [line.strip() for line in lines if line.lstrip().startswith("File ")]
+        excerpt = "\n".join((failures + frames)[:8])
+        if not excerpt:
+            excerpt = output.strip()[-limit:]
+        return {"summary": excerpt[:limit], "failed_tests": failures[:8]}
+
+    @staticmethod
     def _hash(path: Path) -> str:
         return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -209,8 +220,7 @@ class ForgehandExecutor:
             raise ValueError("action arguments must be an object")
         if (
             not internal
-            and
-            self.request.allowed_actions is not None
+            and self.request.allowed_actions is not None
             and action.type not in self.request.allowed_actions
         ):
             raise PermissionError(f"action {action.type} is not allowed by the task contract")
@@ -567,6 +577,7 @@ class ForgehandExecutor:
             "runtime_seconds": round(time.monotonic() - started, 3),
             "validated_tree_hash": self._repository_fingerprint(),
             "output": output,
+            "failure_delta": self._failure_delta(combined) if completed.returncode else None,
             "output_truncated": truncated,
             "summary": f"{command_id} exited {completed.returncode}",
         }
@@ -644,6 +655,7 @@ class ForgehandExecutor:
                 "exit_code": result["exit_code"],
                 "runtime_seconds": result["runtime_seconds"],
                 "validated_tree_hash": result["validated_tree_hash"],
+                "failure_delta": result["failure_delta"],
             }
             for command_id, result in self.command_results.items()
         }
@@ -804,7 +816,12 @@ class ForgehandExecutor:
             ]
         return {
             "step": step,
-            "workflow_phase": ("validate_or_complete" if self._has_edit else "inspect_then_edit"),
+            "workflow_phase": (
+                "repair"
+                if self._has_edit
+                and any(item["exit_code"] != 0 for item in self.command_results.values())
+                else ("validate_or_complete" if self._has_edit else "inspect_then_edit")
+            ),
             "source_revision": source_revision,
             "allowed_action_types": allowed_actions,
             "changed_files": changed,
