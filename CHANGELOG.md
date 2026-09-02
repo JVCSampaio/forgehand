@@ -3,6 +3,15 @@
 All notable changes will be documented here. Forgehand follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.2 - 2026-09-01
+
+- Bound required-command evidence to a compact fingerprint of the exact Git-visible
+  repository state validated by each command.
+- Reject stale successful validation after tracked, staged, deleted, renamed, or
+  untracked non-ignored changes; ignored outputs remain excluded.
+- Surface stale command IDs in compact receipts and distinguish stale gates in the
+  local dashboard.
+
 ## 0.2.1 - 2026-09-01
 
 - Made deterministic gate enforcement explicit in runtime facts and receipts so small

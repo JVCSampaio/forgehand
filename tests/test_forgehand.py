@@ -363,8 +363,173 @@ def test_blocked_receipt_preserves_failed_required_command_evidence(tmp_path: Pa
         "required_command_ids": ["validate"],
         "missing_command_ids": [],
         "failed_command_ids": ["validate"],
+        "stale_command_ids": [],
+        "current_tree_hash": None,
         "passed": False,
     }
+
+
+def test_required_command_becomes_stale_after_repository_change(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    request = TaskRequest(
+        repository_root=str(repository),
+        objective="Validate the current fixture.",
+        scope=["src"],
+        acceptance_criteria=["The validation corresponds to the current tree."],
+        commands=[RepoCommand(command_id="validate", argv=[sys.executable, "-c", "pass"])],
+        required_command_ids=["validate"],
+        acknowledge_host_command_risk=True,
+    )
+    executor = ForgehandExecutor(
+        _config(tmp_path, repository),
+        request,
+        checkout=repository,
+        task_root=tmp_path / "task",
+    )
+    completion = WorkerAction(
+        type="complete",
+        arguments={"status": "success", "summary": "Validated."},
+    )
+
+    first = executor.execute(
+        1, WorkerAction(type="run_command", arguments={"command_id": "validate"})
+    )
+    executor.execute(
+        2,
+        WorkerAction(
+            type="replace_text",
+            arguments={
+                "path": "src/value.txt",
+                "old_text": "before",
+                "new_text": "after",
+                "expected_replacements": 1,
+            },
+        ),
+    )
+
+    gate = executor.required_command_gate()
+    assert gate["stale_command_ids"] == ["validate"]
+    assert gate["current_tree_hash"] != first["result"]["validated_tree_hash"]
+    assert gate["passed"] is False
+    with pytest.raises(ValueError, match="stale: validate"):
+        executor.execute(3, completion)
+
+    refreshed = executor.execute(
+        4, WorkerAction(type="run_command", arguments={"command_id": "validate"})
+    )
+    assert (
+        refreshed["result"]["validated_tree_hash"]
+        == executor.required_command_gate()["current_tree_hash"]
+    )
+    assert executor.execute(5, completion)["result"]["status"] == "success"
+
+
+def test_command_validates_its_post_command_repository_state(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    request = TaskRequest(
+        repository_root=str(repository),
+        objective="Modify and validate the fixture.",
+        scope=["src"],
+        acceptance_criteria=["The command's resulting tree is validated."],
+        commands=[
+            RepoCommand(
+                command_id="format",
+                argv=[
+                    sys.executable,
+                    "-c",
+                    "from pathlib import Path; Path('src/value.txt').write_text('after\\n')",
+                ],
+            )
+        ],
+        required_command_ids=["format"],
+        acknowledge_host_command_risk=True,
+    )
+    executor = ForgehandExecutor(
+        _config(tmp_path, repository),
+        request,
+        checkout=repository,
+        task_root=tmp_path / "task",
+    )
+
+    command = executor.execute(
+        1, WorkerAction(type="run_command", arguments={"command_id": "format"})
+    )
+    gate = executor.required_command_gate()
+
+    assert command["result"]["exit_code"] == 0
+    assert command["result"]["validated_tree_hash"] == gate["current_tree_hash"]
+    assert gate["stale_command_ids"] == []
+    assert gate["passed"] is True
+
+
+def test_fingerprint_tracks_untracked_content_but_ignores_ignored_files(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    (repository / ".gitignore").write_text("ignored.tmp\n", encoding="utf-8")
+    _git(repository, "add", ".gitignore")
+    _git(repository, "commit", "-m", "ignore fixture")
+    request = TaskRequest(
+        repository_root=str(repository),
+        objective="Validate Git-visible files.",
+        scope=["src"],
+        acceptance_criteria=["Ignored files do not stale validation."],
+        commands=[RepoCommand(command_id="validate", argv=[sys.executable, "-c", "pass"])],
+        required_command_ids=["validate"],
+        acknowledge_host_command_risk=True,
+    )
+    executor = ForgehandExecutor(
+        _config(tmp_path, repository),
+        request,
+        checkout=repository,
+        task_root=tmp_path / "task",
+    )
+    executor.execute(1, WorkerAction(type="run_command", arguments={"command_id": "validate"}))
+
+    (repository / "ignored.tmp").write_text("ignored", encoding="utf-8")
+    assert executor.required_command_gate()["passed"] is True
+
+    untracked = repository / "evidence.txt"
+    untracked.write_text("one", encoding="utf-8")
+    assert executor.required_command_gate()["stale_command_ids"] == ["validate"]
+    executor.execute(2, WorkerAction(type="run_command", arguments={"command_id": "validate"}))
+    untracked.write_text("two", encoding="utf-8")
+    assert executor.required_command_gate()["stale_command_ids"] == ["validate"]
+
+
+def test_fingerprint_tracks_staged_renamed_and_deleted_files(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    request = TaskRequest(
+        repository_root=str(repository),
+        objective="Validate every Git-visible tracked state.",
+        scope=["src"],
+        acceptance_criteria=["Staged, renamed, and deleted files stale validation."],
+        commands=[RepoCommand(command_id="validate", argv=[sys.executable, "-c", "pass"])],
+        required_command_ids=["validate"],
+        acknowledge_host_command_risk=True,
+    )
+    executor = ForgehandExecutor(
+        _config(tmp_path, repository),
+        request,
+        checkout=repository,
+        task_root=tmp_path / "task",
+    )
+
+    def run_validation(step: int) -> None:
+        executor.execute(
+            step, WorkerAction(type="run_command", arguments={"command_id": "validate"})
+        )
+
+    run_validation(1)
+    (repository / "src" / "value.txt").write_text("staged\n", encoding="utf-8")
+    _git(repository, "add", "src/value.txt")
+    assert executor.required_command_gate()["stale_command_ids"] == ["validate"]
+
+    run_validation(2)
+    _git(repository, "mv", "src/value.txt", "src/renamed.txt")
+    assert executor.required_command_gate()["stale_command_ids"] == ["validate"]
+
+    run_validation(3)
+    (repository / "src" / "renamed.txt").unlink()
+    assert executor.required_command_gate()["stale_command_ids"] == ["validate"]
 
 
 def test_host_commands_require_explicit_risk_acknowledgement(tmp_path: Path) -> None:

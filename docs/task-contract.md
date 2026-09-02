@@ -29,9 +29,12 @@ return `success`.
 }
 ```
 
-The runtime rejects `success` when a required command is missing or its most recent
-exit code is nonzero. `partial`, `needs_review`, and `blocked` remain available so a
-worker can stop honestly without fabricating success.
+The runtime records a compact fingerprint of the Git-visible repository state after
+each command. It rejects `success` when a required command is missing, its most recent
+exit code is nonzero, or the repository has changed since that successful run. Staged,
+unstaged, deleted, renamed, and untracked non-ignored content participates in the
+fingerprint; ignored build outputs do not. `partial`, `needs_review`, and `blocked`
+remain available so a worker can stop honestly without fabricating success.
 
 ## Host command boundary
 

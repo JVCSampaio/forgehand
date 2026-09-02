@@ -46,8 +46,10 @@ the evidence returned for supervisor review.
 
 Natural-language acceptance criteria guide the worker and reviewer. Deterministic
 acceptance gates are expressed as `required_command_ids`: every named command must
-have run and exited zero before Forgehand permits a `success` completion. This gate
-does not replace final supervisor review.
+have run, exited zero, and validated the current Git-visible repository state before
+Forgehand permits a `success` completion. Compact hashes make later tracked or
+untracked changes stale without sending diffs back through the model context. This
+gate does not replace final supervisor review.
 
 File capabilities are enforced inside the detached worktree. Process execution is a
 separate trust boundary: approved commands use `shell=False` and a scrubbed environment,

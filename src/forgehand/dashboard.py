@@ -25,6 +25,7 @@ def dashboard_snapshot(config: ForgehandConfig, *, limit: int = 100) -> dict[str
         "wall_seconds": 0.0,
         "required_gates": 0,
         "passed_gates": 0,
+        "stale_gates": 0,
     }
     for task in tasks:
         metrics = task.get("metrics") or {}
@@ -37,9 +38,11 @@ def dashboard_snapshot(config: ForgehandConfig, *, limit: int = 100) -> dict[str
         gate = task.get("required_command_gate") or {}
         gate_required = bool(gate.get("required_command_ids"))
         gate_passed = bool(gate.get("passed"))
+        gate_stale = bool(gate.get("stale_command_ids"))
         if gate_required:
             totals["required_gates"] += 1
             totals["passed_gates"] += int(gate_passed)
+            totals["stale_gates"] += int(gate_stale)
         rows.append(
             {
                 "task_id": task.get("task_id"),
@@ -52,7 +55,9 @@ def dashboard_snapshot(config: ForgehandConfig, *, limit: int = 100) -> dict[str
                 "calls": int(metrics.get("model_calls") or 0),
                 "invalid_attempts": int(metrics.get("invalid_attempts") or 0),
                 "validation_gate": (
-                    "passed"
+                    "stale"
+                    if gate_required and gate_stale
+                    else "passed"
                     if gate_required and gate_passed
                     else "failed"
                     if gate_required
@@ -86,7 +91,7 @@ main{max-width:1120px;margin:auto;padding:48px 24px}header{display:flex;justify-
 <div class="table-wrap"><table><thead><tr><th>Status</th><th>Validation</th><th>Repository</th><th>Summary</th><th>Tokens</th><th>Calls</th><th>Changed</th><th>Finished</th></tr></thead><tbody id="rows"></tbody></table></div>
 <footer id="notice"></footer></main><script>
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-async function refresh(){const d=await fetch('/api/summary',{cache:'no-store'}).then(r=>r.json());const t=d.totals;document.querySelector('#tasks').textContent=t.tasks.toLocaleString();document.querySelector('#tokens').textContent=t.tokens.toLocaleString();document.querySelector('#calls').textContent=t.calls.toLocaleString();document.querySelector('#rate').textContent=t.tasks?Math.round(100*(d.statuses.success||0)/t.tasks)+'%':'—';document.querySelector('#gates').textContent=t.required_gates?`${t.passed_gates}/${t.required_gates}`:'—';document.querySelector('#notice').textContent=d.notice;document.querySelector('#rows').innerHTML=d.tasks.map(x=>`<tr><td class="status ${esc(x.status)}">${esc(x.status)}</td><td class="status ${x.validation_gate==='passed'?'success':x.validation_gate==='failed'?'blocked':''}">${esc(x.validation_gate)}</td><td><code>${esc(x.repository)}</code></td><td>${esc(x.summary||'—')}</td><td>${x.tokens.toLocaleString()}</td><td>${x.calls}</td><td>${x.changed_files}</td><td>${esc(x.finished_at||'—')}</td></tr>`).join('')||'<tr><td colspan="8">No completed tasks yet.</td></tr>'}refresh();setInterval(refresh,5000);
+async function refresh(){const d=await fetch('/api/summary',{cache:'no-store'}).then(r=>r.json());const t=d.totals;document.querySelector('#tasks').textContent=t.tasks.toLocaleString();document.querySelector('#tokens').textContent=t.tokens.toLocaleString();document.querySelector('#calls').textContent=t.calls.toLocaleString();document.querySelector('#rate').textContent=t.tasks?Math.round(100*(d.statuses.success||0)/t.tasks)+'%':'—';document.querySelector('#gates').textContent=t.required_gates?`${t.passed_gates}/${t.required_gates}${t.stale_gates?` · ${t.stale_gates} stale`:''}`:'—';document.querySelector('#notice').textContent=d.notice;document.querySelector('#rows').innerHTML=d.tasks.map(x=>`<tr><td class="status ${esc(x.status)}">${esc(x.status)}</td><td class="status ${x.validation_gate==='passed'?'success':x.validation_gate==='failed'||x.validation_gate==='stale'?'blocked':''}">${esc(x.validation_gate)}</td><td><code>${esc(x.repository)}</code></td><td>${esc(x.summary||'—')}</td><td>${x.tokens.toLocaleString()}</td><td>${x.calls}</td><td>${x.changed_files}</td><td>${esc(x.finished_at||'—')}</td></tr>`).join('')||'<tr><td colspan="8">No completed tasks yet.</td></tr>'}refresh();setInterval(refresh,5000);
 </script></body></html>"""
 
 

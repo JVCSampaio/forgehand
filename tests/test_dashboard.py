@@ -42,8 +42,39 @@ def test_dashboard_snapshot_is_aggregated_and_hides_paths(tmp_path) -> None:
         "wall_seconds": 3.5,
         "required_gates": 1,
         "passed_gates": 1,
+        "stale_gates": 0,
     }
     assert snapshot["tasks"][0]["repository"] == repository.name
     assert snapshot["tasks"][0]["validation_gate"] == "passed"
     assert str(repository) not in json.dumps(snapshot)
     assert TaskRunner(config).list_tasks(1)
+
+
+def test_dashboard_distinguishes_stale_validation(tmp_path) -> None:
+    repository = _repository(tmp_path)
+    config = _config(tmp_path, repository)
+    task_root = config.repo_tasks.worktree_root / "00000000-0000-0000-0000-000000000002"
+    task_root.mkdir(parents=True)
+    (task_root / "result.json").write_text(
+        json.dumps(
+            {
+                "task_id": task_root.name,
+                "status": "blocked",
+                "repository_root": str(repository),
+                "required_command_gate": {
+                    "required_command_ids": ["tests"],
+                    "missing_command_ids": [],
+                    "failed_command_ids": [],
+                    "stale_command_ids": ["tests"],
+                    "passed": False,
+                },
+                "metrics": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    snapshot = dashboard_snapshot(config)
+
+    assert snapshot["totals"]["stale_gates"] == 1
+    assert snapshot["tasks"][0]["validation_gate"] == "stale"

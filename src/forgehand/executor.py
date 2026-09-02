@@ -21,7 +21,7 @@ SENSITIVE_ENV_NAME = re.compile(
 )
 
 
-def _git(root: Path, *arguments: str, timeout: int = 60) -> str:
+def _git_bytes(root: Path, *arguments: str, timeout: int = 60) -> bytes:
     environment = dict(os.environ)
     environment.update({"GIT_PAGER": "cat", "GIT_OPTIONAL_LOCKS": "0"})
     completed = subprocess.run(
@@ -29,15 +29,17 @@ def _git(root: Path, *arguments: str, timeout: int = 60) -> str:
         env=environment,
         stdin=subprocess.DEVNULL,
         capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
         timeout=timeout,
         check=False,
     )
     if completed.returncode != 0:
-        raise RuntimeError((completed.stderr or completed.stdout).strip()[-2000:])
+        message = (completed.stderr or completed.stdout).decode("utf-8", errors="replace")
+        raise RuntimeError(message.strip()[-2000:])
     return completed.stdout
+
+
+def _git(root: Path, *arguments: str, timeout: int = 60) -> str:
+    return _git_bytes(root, *arguments, timeout=timeout).decode("utf-8", errors="replace")
 
 
 class ForgehandExecutor:
@@ -138,6 +140,47 @@ class ForgehandExecutor:
     @staticmethod
     def _hash(path: Path) -> str:
         return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    def _repository_fingerprint(self) -> str:
+        """Hash the Git-visible checkout state without exposing its contents."""
+        digest = hashlib.sha256()
+        digest.update(b"forgehand-repository-state-v1\0")
+        tracked = _git_bytes(
+            self.checkout,
+            "diff",
+            "HEAD",
+            "--no-ext-diff",
+            "--binary",
+            "--",
+            timeout=180,
+        )
+        digest.update(len(tracked).to_bytes(8, "big"))
+        digest.update(tracked)
+
+        untracked = _git_bytes(
+            self.checkout,
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+            "-z",
+            timeout=180,
+        )
+        for relative_bytes in sorted(path for path in untracked.split(b"\0") if path):
+            path = self.checkout / os.fsdecode(relative_bytes)
+            digest.update(len(relative_bytes).to_bytes(8, "big"))
+            digest.update(relative_bytes)
+            if path.is_symlink():
+                target = os.fsencode(os.readlink(path))
+                digest.update(b"symlink\0")
+                digest.update(len(target).to_bytes(8, "big"))
+                digest.update(target)
+                continue
+            digest.update(b"file\0")
+            digest.update(b"executable\0" if path.stat().st_mode & 0o111 else b"regular\0")
+            with path.open("rb") as handle:
+                for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    digest.update(chunk)
+        return digest.hexdigest()
 
     def _artifact(self, step: int, action_type: str, result: dict[str, Any]) -> ArtifactRef:
         artifact_id = f"step:{step:03d}:{action_type}"
@@ -463,6 +506,7 @@ class ForgehandExecutor:
             "argv": command.argv,
             "exit_code": completed.returncode,
             "runtime_seconds": round(time.monotonic() - started, 3),
+            "validated_tree_hash": self._repository_fingerprint(),
             "output": output,
             "output_truncated": truncated,
             "summary": f"{command_id} exited {completed.returncode}",
@@ -475,6 +519,7 @@ class ForgehandExecutor:
             command_id: {
                 "exit_code": result["exit_code"],
                 "runtime_seconds": result["runtime_seconds"],
+                "validated_tree_hash": result["validated_tree_hash"],
             }
             for command_id, result in self.command_results.items()
         }
@@ -488,12 +533,26 @@ class ForgehandExecutor:
             if command_id in self.command_results
             and self.command_results[command_id]["exit_code"] != 0
         ]
+        successful = [
+            command_id
+            for command_id in required
+            if command_id in self.command_results
+            and self.command_results[command_id]["exit_code"] == 0
+        ]
+        current_tree_hash = self._repository_fingerprint() if successful else None
+        stale = [
+            command_id
+            for command_id in successful
+            if self.command_results[command_id]["validated_tree_hash"] != current_tree_hash
+        ]
         return {
             "enforced": True,
             "required_command_ids": required,
             "missing_command_ids": missing,
             "failed_command_ids": failed,
-            "passed": not missing and not failed,
+            "stale_command_ids": stale,
+            "current_tree_hash": current_tree_hash,
+            "passed": not missing and not failed and not stale,
         }
 
     def _action_inspect_diff(self, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -532,6 +591,8 @@ class ForgehandExecutor:
                 problems.append("not run: " + ", ".join(gate["missing_command_ids"]))
             if gate["failed_command_ids"]:
                 problems.append("failed: " + ", ".join(gate["failed_command_ids"]))
+            if gate["stale_command_ids"]:
+                problems.append("stale: " + ", ".join(gate["stale_command_ids"]))
             raise ValueError(
                 "success requires passing required commands (" + "; ".join(problems) + ")"
             )

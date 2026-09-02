@@ -360,6 +360,8 @@ class ForgehandRuntime:
                         "required_command_ids": [],
                         "missing_command_ids": [],
                         "failed_command_ids": [],
+                        "stale_command_ids": [],
+                        "current_tree_hash": None,
                         "passed": True,
                     }
                 ),

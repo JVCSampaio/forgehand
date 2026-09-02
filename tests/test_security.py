@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -48,6 +49,24 @@ def test_command_environment_removes_common_credential_channels(
 ) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
+    (repository / "fixture.txt").write_text("fixture\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repository), "init"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(repository), "config", "user.email", "tests@example.invalid"],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "config", "user.name", "Test Runner"],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(["git", "-C", str(repository), "add", "."], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(repository), "commit", "-m", "fixture"],
+        check=True,
+        capture_output=True,
+    )
     request = TaskRequest(
         repository_root=str(repository),
         objective="Inspect the command environment.",
