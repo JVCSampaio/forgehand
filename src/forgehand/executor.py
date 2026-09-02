@@ -63,6 +63,9 @@ class ForgehandExecutor:
         self._repository_generation = 0
         self._complete_reads: dict[str, int] = {}
         self._last_repeatable_action: tuple[str, str] | None = None
+        self.recovery_mode = False
+        self.recovery_ready = False
+        self.recovery_edit_used = False
         self._has_edit = False
 
     def _in_scope(self, relative: str) -> bool:
@@ -218,10 +221,22 @@ class ForgehandExecutor:
         arguments = action.arguments
         if not isinstance(arguments, dict):
             raise ValueError("action arguments must be an object")
+        recovery_allowed = (
+            {"read_file", "read_files", "search_text"}
+            if self.recovery_mode and not self.recovery_ready
+            else {"edit_file", "apply_patch", "complete"}
+            if self.recovery_mode
+            else None
+        )
+        if recovery_allowed is not None and not internal and action.type not in recovery_allowed:
+            raise PermissionError(
+                f"recovery mode permits only: {', '.join(sorted(recovery_allowed))}"
+            )
         if (
             not internal
             and self.request.allowed_actions is not None
             and action.type not in self.request.allowed_actions
+            and not (recovery_allowed is not None and action.type in recovery_allowed)
         ):
             raise PermissionError(f"action {action.type} is not allowed by the task contract")
         if self.request.edit_mode == "apply_patch_only" and action.type in {
@@ -257,6 +272,8 @@ class ForgehandExecutor:
                     f"{relative} was already read completely and the repository is unchanged; "
                     "do not read it again—complete, run an approved check, or choose new work"
                 )
+            if self.recovery_mode and not self.recovery_ready:
+                self.recovery_ready = True
         if action.type == "read_files" and isinstance(arguments.get("paths"), list):
             repeated = [
                 path
@@ -270,6 +287,8 @@ class ForgehandExecutor:
                     "files were already read completely and the repository is unchanged: "
                     + ", ".join(repeated)
                 )
+            if self.recovery_mode and not self.recovery_ready:
+                self.recovery_ready = True
         handler = getattr(self, f"_action_{action.type}", None)
         if handler is None:  # pragma: no cover - guarded by the schema
             raise ValueError(f"unsupported action: {action.type}")
@@ -814,6 +833,12 @@ class ForgehandExecutor:
             allowed_actions = [
                 item for item in allowed_actions if item in self.request.allowed_actions
             ]
+        if self.recovery_mode:
+            allowed_actions = (
+                ["read_file", "read_files", "search_text"]
+                if not self.recovery_ready
+                else ["edit_file", "apply_patch", "complete"]
+            )
         return {
             "step": step,
             "workflow_phase": (
@@ -837,4 +862,9 @@ class ForgehandExecutor:
                 "host_risk_acknowledged": self.request.acknowledge_host_command_risk,
             },
             "command_results": self.command_evidence(),
+            "recovery": {
+                "active": self.recovery_mode,
+                "read_required": self.recovery_mode and not self.recovery_ready,
+                "repair_attempts_remaining": 0 if self.recovery_edit_used else 1,
+            },
         }

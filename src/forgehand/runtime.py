@@ -117,6 +117,31 @@ class ForgehandRuntime:
         )
 
     @staticmethod
+    def _rejection_kind(error: Exception) -> str:
+        message = str(error).lower()
+        if "not allowed" in message or "recovery mode permits" in message:
+            return "ACTION_NOT_ALLOWED"
+        if "outside" in message or "scope" in message:
+            return "OUT_OF_SCOPE"
+        if "same command" in message or "already read" in message:
+            return "REDUNDANT_ACTION"
+        if "patch" in message or "replace" in message or "file" in message:
+            return "EDIT_CONFLICT"
+        return "INVALID_ACTION"
+
+    @staticmethod
+    def _recovery_capsule(error: Exception, action: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "mode": "RECOVERY_REQUIRED",
+            "failure_kind": ForgehandRuntime._rejection_kind(error),
+            "failed_action": action.get("type"),
+            "evidence": str(error)[:700],
+            "required_next_intent": "Read the relevant scoped file before repairing.",
+            "allowed_actions": ["read_file", "read_files", "search_text"],
+            "forbidden_actions": ["run_command", "inspect_diff", "complete", "edit_other_file"],
+        }
+
+    @staticmethod
     def _with_artifact(state: AgentState, artifact: ArtifactRef) -> AgentState:
         payload = state.model_dump(mode="json")
         refs = [item for item in payload["artifact_refs"] if item["id"] != artifact.id]
@@ -206,6 +231,7 @@ class ForgehandRuntime:
                 )
         invalid_attempts = 0
         action_rejections = 0
+        consecutive_rejections = 0
         no_progress_steps = 0
         maximum_steps = min(
             request.max_iterations,
@@ -280,6 +306,11 @@ class ForgehandRuntime:
             try:
                 before_tree = executor._repository_fingerprint()
                 action_result = executor.execute(step, result.decision.action)
+                consecutive_rejections = 0
+                recovery_edit = executor.recovery_mode and result.decision.action.type in {
+                    "edit_file",
+                    "apply_patch",
+                }
                 candidate = self._with_artifact(candidate, action_result["artifact"])
                 candidate = self._with_runtime_intent(candidate, action_result)
 
@@ -333,6 +364,20 @@ class ForgehandRuntime:
                         ensure_ascii=False,
                         separators=(",", ":"),
                     )
+                    if executor.recovery_mode:
+                        if recovery_edit:
+                            executor.recovery_edit_used = True
+                        if any(item["exit_code"] != 0 for item in validations):
+                            return self._blocked(
+                                store,
+                                started,
+                                invalid_attempts,
+                                "recovery repair did not pass required validation",
+                                executor=executor,
+                            )
+                        executor.recovery_mode = False
+                        executor.recovery_ready = False
+                        executor.recovery_edit_used = True
                 after_tree = executor._repository_fingerprint()
                 if result.decision.action.type == "inspect_diff":
                     no_progress_steps += 1
@@ -351,9 +396,19 @@ class ForgehandRuntime:
                 redundant_observation = "already read completely" in str(exc)
                 if not redundant_observation:
                     action_rejections += 1
-                observation = f"ACTION_REJECTED: {type(exc).__name__}: {exc}"[
-                    : self.config.forgehand.max_observation_chars
-                ]
+                    consecutive_rejections += 1
+                if consecutive_rejections >= 2 and not executor.recovery_mode:
+                    executor.recovery_mode = True
+                    executor.recovery_ready = False
+                    observation = json.dumps(
+                        self._recovery_capsule(exc, result.decision.action.model_dump(mode="json")),
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                else:
+                    observation = f"ACTION_REJECTED: {type(exc).__name__}: {exc}"[
+                        : self.config.forgehand.max_observation_chars
+                    ]
                 store.record_event(
                     step=step,
                     revision=revision,

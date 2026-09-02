@@ -25,6 +25,9 @@ reads/searches, one optional baseline validation, or a scoped edit, while
 validate_or_complete permits completion; repair permits edit_file or completion. The runtime
 validates automatically
 after each edit; do not request validation repeatedly.
+When RUNTIME_FACTS.recovery.active is true, obey its allowed_action_types exactly: read the
+relevant file first, then make one constrained repair with edit_file/apply_patch. Do not
+invent commands or inspect_diff during recovery.
 Only choose an action listed in RUNTIME_FACTS.allowed_action_types.
 Use paths exactly as listed in task_contract.scope; do not invent directory
 prefixes such as src/ when the declared scope contains a file at the repository root.
