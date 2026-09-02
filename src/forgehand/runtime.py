@@ -321,6 +321,14 @@ class ForgehandRuntime:
                                 }
                                 for item in validations
                             ],
+                            "repair_instruction": (
+                                "Validation failed. In repair phase, use edit_file on the "
+                                "scoped source "
+                                "to fix the reported failure, then choose complete; do not request "
+                                "run_command or inspect_diff because validation is runtime-managed."
+                                if any(item["exit_code"] != 0 for item in validations)
+                                else None
+                            ),
                         },
                         ensure_ascii=False,
                         separators=(",", ":"),
