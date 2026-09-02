@@ -201,8 +201,8 @@ class ForgehandExecutor:
         if not isinstance(arguments, dict):
             raise ValueError("action arguments must be an object")
         if self.request.requires_changes and not internal:
-            if not self._has_edit and action.type == "run_command":
-                raise ValueError("inspect_then_edit phase does not permit validation")
+            if not self._has_edit and action.type == "run_command" and self.command_results:
+                raise ValueError("only one pre-edit validation is permitted")
             if self._has_edit and action.type == "run_command":
                 raise ValueError("validation is runtime-controlled after an edit")
         if self.request.requires_changes and action.type == "run_command" and not self._has_edit:
