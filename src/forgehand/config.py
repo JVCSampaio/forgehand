@@ -54,6 +54,7 @@ class RuntimeSettings(BaseModel):
     inference_timeout_seconds: int = Field(240, ge=10, le=1_200)
     invalid_output_retries: int = Field(2, ge=0, le=5)
     max_action_rejections: int = Field(3, ge=1, le=20)
+    max_no_progress_steps: int = Field(2, ge=1, le=10)
 
 
 class ForgehandConfig(BaseModel):

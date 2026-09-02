@@ -196,6 +196,7 @@ class ForgehandRuntime:
                 )
         invalid_attempts = 0
         action_rejections = 0
+        no_progress_steps = 0
         maximum_steps = min(
             request.max_iterations,
             self.config.forgehand.max_steps,
@@ -260,6 +261,7 @@ class ForgehandRuntime:
                 )
 
             try:
+                before_tree = executor._repository_fingerprint()
                 action_result = executor.execute(step, result.decision.action)
                 candidate = self._with_artifact(candidate, action_result["artifact"])
                 candidate = self._with_runtime_intent(candidate, action_result)
@@ -297,6 +299,22 @@ class ForgehandRuntime:
                         },
                         ensure_ascii=False,
                         separators=(",", ":"),
+                    )
+                after_tree = executor._repository_fingerprint()
+                if result.decision.action.type == "inspect_diff":
+                    no_progress_steps += 1
+                elif (
+                    result.decision.action.type in {"replace_text", "write_file", "create_file"}
+                    or before_tree != after_tree
+                ):
+                    no_progress_steps = 0
+                if no_progress_steps >= self.config.forgehand.max_no_progress_steps:
+                    return self._blocked(
+                        store,
+                        started,
+                        invalid_attempts,
+                        f"worker made no progress for {no_progress_steps} steps",
+                        executor=executor,
                     )
             except Exception as exc:
                 invalid_attempts += 1

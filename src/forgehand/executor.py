@@ -200,6 +200,11 @@ class ForgehandExecutor:
         arguments = action.arguments
         if not isinstance(arguments, dict):
             raise ValueError("action arguments must be an object")
+        if self.request.requires_changes:
+            if not self._has_edit and action.type == "run_command":
+                raise ValueError("inspect_then_edit phase does not permit validation")
+            if self._has_edit and action.type == "run_command":
+                raise ValueError("validation is runtime-controlled after an edit")
         if self.request.requires_changes and action.type == "run_command" and not self._has_edit:
             raise ValueError("validation cannot run before the first scoped edit")
         if action.type == "run_command":
