@@ -580,7 +580,7 @@ class ForgehandExecutor:
 
     def _action_complete(self, arguments: dict[str, Any]) -> dict[str, Any]:
         status = arguments.get("status")
-        if status in {"completed", "done"}:
+        if status in {"complete", "completed", "done"}:
             status = "success"
         if status not in {"success", "partial", "needs_review", "blocked"}:
             raise ValueError("completion status is invalid")

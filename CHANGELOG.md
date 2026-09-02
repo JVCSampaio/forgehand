@@ -3,6 +3,11 @@
 All notable changes will be documented here. Forgehand follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.3 - 2026-09-01
+
+- Accepted the common `complete` completion-status alias from small local models,
+  preventing repeated invalid retries after a valid task result.
+
 ## 0.2.2 - 2026-09-01
 
 - Bound required-command evidence to a compact fingerprint of the exact Git-visible

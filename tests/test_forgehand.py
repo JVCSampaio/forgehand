@@ -601,6 +601,31 @@ def test_numeric_action_arguments_accept_json_digit_strings(tmp_path: Path) -> N
     assert reread["result"]["text"] == "after\n"
 
 
+def test_complete_status_alias_is_normalized_to_success(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    executor = ForgehandExecutor(
+        _config(tmp_path, repository),
+        TaskRequest(
+            repository_root=str(repository),
+            objective="Complete the fixture.",
+            scope=["src"],
+            acceptance_criteria=["The worker can finish."],
+        ),
+        checkout=repository,
+        task_root=tmp_path / "task",
+    )
+
+    completed = executor.execute(
+        1,
+        WorkerAction(
+            type="complete",
+            arguments={"status": "complete", "summary": "Finished."},
+        ),
+    )
+
+    assert completed["result"]["status"] == "success"
+
+
 def test_bounded_batch_read_reduces_multi_file_round_trips(tmp_path: Path) -> None:
     repository = _repository(tmp_path)
     (repository / "src" / "second.txt").write_text("second\n", encoding="utf-8")
