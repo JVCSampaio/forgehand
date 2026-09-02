@@ -12,6 +12,7 @@ from forgehand.inference import (
     InferenceResponseError,
     OpenAICompatibleInference,
 )
+from forgehand.memory import RepositoryMemory
 from forgehand.models import (
     AgentState,
     ArtifactRef,
@@ -178,6 +179,7 @@ class ForgehandRuntime:
             checkout=checkout,
             task_root=task_root,
         )
+        memory = RepositoryMemory(self.config.memory.path) if self.config.memory.enabled else None
         observation = (
             "Task initialized. Inspect the declared scope before editing. "
             f"The immutable contract is stored at {contract_path}."
@@ -207,6 +209,13 @@ class ForgehandRuntime:
 
         for step in range(completed_step + 1, maximum_steps + 1):
             facts = executor.runtime_facts(step=step, source_revision=source_revision)
+            if memory:
+                facts["repository_memory"] = memory.retrieve(
+                    Path(request.repository_root).resolve(),
+                    source_revision,
+                    request.objective,
+                    self.config.memory.max_context_chars,
+                )
             context = self._context(
                 request=request,
                 source_revision=source_revision,
@@ -359,6 +368,14 @@ class ForgehandRuntime:
 
             if action_result["completed"]:
                 completion = action_result["result"]
+                if memory and completion["status"] == "success":
+                    memory.record(
+                        Path(request.repository_root).resolve(),
+                        source_revision,
+                        f"{request.objective} | {completion['summary']}",
+                        str(contract_path),
+                        result.decision.confidence,
+                    )
                 metrics = store.metrics()
                 metrics.update(
                     {

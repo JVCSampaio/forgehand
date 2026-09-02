@@ -58,11 +58,18 @@ class RuntimeSettings(BaseModel):
     max_no_progress_steps: int = Field(2, ge=1, le=10)
 
 
+class MemorySettings(BaseModel):
+    enabled: bool = False
+    path: Path = Field(default_factory=lambda: default_data_path() / "repository-memory.sqlite3")
+    max_context_chars: int = Field(2400, ge=200, le=20_000)
+
+
 class ForgehandConfig(BaseModel):
     project_root: Path
     worker: WorkerSettings = Field(default_factory=WorkerSettings)
     repo_tasks: RepositorySettings = Field(default_factory=RepositorySettings)
     forgehand: RuntimeSettings = Field(default_factory=RuntimeSettings)
+    memory: MemorySettings = Field(default_factory=lambda: MemorySettings())
 
     @model_validator(mode="after")
     def resolve_paths(self) -> ForgehandConfig:
@@ -73,6 +80,7 @@ class ForgehandConfig(BaseModel):
 
         self.repo_tasks.roots = [absolute(path) for path in self.repo_tasks.roots]
         self.repo_tasks.worktree_root = absolute(self.repo_tasks.worktree_root)
+        self.memory.path = absolute(self.memory.path)
         return self
 
 
