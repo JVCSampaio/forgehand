@@ -139,7 +139,13 @@ class ForgehandRuntime:
                 "the repository is unchanged. Read only truncated continuations if necessary, "
                 "then complete or take the specific next action required by the contract."
             )
-        elif action_type in {"replace_text", "write_file", "create_file"}:
+        elif action_type in {
+            "replace_text",
+            "write_file",
+            "create_file",
+            "edit_file",
+            "apply_patch",
+        }:
             intent = (
                 "The repository changed. Validate it once with a distinct read, diff, or "
                 "approved command, then complete when the acceptance criteria are satisfied."
@@ -280,7 +286,13 @@ class ForgehandRuntime:
                 # For implementation tasks, validation is a runtime concern:
                 # execute declared required checks immediately after an edit so
                 # the worker only receives a compact pass/fail observation.
-                edit_actions = {"replace_text", "write_file", "create_file", "apply_patch"}
+                edit_actions = {
+                    "replace_text",
+                    "write_file",
+                    "create_file",
+                    "apply_patch",
+                    "edit_file",
+                }
                 if (
                     result.decision.action.type in edit_actions
                     and request.requires_changes

@@ -65,6 +65,7 @@ Efficiency rules:
 - write_file: {path, content} (replace the complete file, or create it)
 - create_file: {path, content}
 - apply_patch: {patch} (a unified diff touching only declared files)
+- edit_file: {path, old_text, new_text, expected_replacements?} (preferred for small fixes)
 For edit_mode=apply_patch_only implementation tasks, after inspection you MUST
 return apply_patch with a non-empty unified diff for the declared source file.
 Do not return an empty patch and do not claim success without applying it.

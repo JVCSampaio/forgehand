@@ -87,6 +87,7 @@ class WorkerAction(BaseModel):
         "write_file",
         "create_file",
         "apply_patch",
+        "edit_file",
         "run_command",
         "inspect_diff",
     ]
@@ -189,9 +190,9 @@ class TaskRequest(BaseModel):
         if (
             self.edit_mode == "apply_patch_only"
             and self.allowed_actions is not None
-            and "apply_patch" not in self.allowed_actions
+            and not ({"apply_patch", "edit_file"} & set(self.allowed_actions))
         ):
-            raise ValueError("apply_patch_only requires apply_patch in allowed_actions")
+            raise ValueError("apply_patch_only requires apply_patch or edit_file")
         return self
 
 

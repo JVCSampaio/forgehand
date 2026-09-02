@@ -217,7 +217,7 @@ class ForgehandExecutor:
             "write_file",
             "create_file",
         }:
-            raise PermissionError("apply_patch_only requires the apply_patch action")
+            raise PermissionError("apply_patch_only requires the structured edit action")
         if self.request.requires_changes and not internal:
             if not self._has_edit and action.type == "run_command" and self.command_results:
                 raise ValueError("only one pre-edit validation is permitted")
@@ -262,7 +262,7 @@ class ForgehandExecutor:
         if handler is None:  # pragma: no cover - guarded by the schema
             raise ValueError(f"unsupported action: {action.type}")
         result = handler(arguments)
-        if action.type in {"replace_text", "write_file", "create_file", "apply_patch"}:
+        if action.type in {"replace_text", "write_file", "create_file", "apply_patch", "edit_file"}:
             self._has_edit = True
         if action.type == "run_command":
             self._last_repeatable_action = (
@@ -284,6 +284,7 @@ class ForgehandExecutor:
             "write_file",
             "create_file",
             "apply_patch",
+            "edit_file",
             "run_command",
         }:
             self._repository_generation += 1
@@ -471,6 +472,10 @@ class ForgehandExecutor:
             "sha256": self._hash(path),
             "summary": f"Updated {relative}",
         }
+
+    def _action_edit_file(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        """Apply one exact old_text -> new_text change without unified-diff syntax."""
+        return self._action_replace_text(arguments)
 
     def _action_create_file(self, arguments: dict[str, Any]) -> dict[str, Any]:
         path = self._resolve(arguments.get("path"), must_exist=False)
@@ -753,7 +758,14 @@ class ForgehandExecutor:
         changed = [line[3:] for line in status.splitlines() if len(line) >= 4]
         if self.request.requires_changes:
             if self._has_edit:
-                allowed_actions = ["replace_text", "write_file", "create_file", "complete"]
+                allowed_actions = [
+                    "replace_text",
+                    "write_file",
+                    "create_file",
+                    "apply_patch",
+                    "edit_file",
+                    "complete",
+                ]
             else:
                 allowed_actions = [
                     "list_files",
@@ -764,6 +776,7 @@ class ForgehandExecutor:
                     "write_file",
                     "create_file",
                     "apply_patch",
+                    "edit_file",
                     "inspect_diff",
                 ]
                 if not self.command_results:
@@ -779,6 +792,7 @@ class ForgehandExecutor:
                 "write_file",
                 "create_file",
                 "apply_patch",
+                "edit_file",
                 "run_command",
                 "inspect_diff",
             ]
