@@ -140,6 +140,7 @@ class TaskRequest(BaseModel):
     acceptance_criteria: list[str] = Field(min_length=1, max_length=100)
     commands: list[RepoCommand] = Field(default_factory=list, max_length=20)
     required_command_ids: list[str] = Field(default_factory=list, max_length=20)
+    requires_changes: bool = False
     acknowledge_host_command_risk: bool = False
     base_revision: str = Field(default="HEAD", min_length=1, max_length=200)
     max_iterations: int = Field(default=10, ge=1, le=100)

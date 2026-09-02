@@ -462,6 +462,44 @@ def test_command_validates_its_post_command_repository_state(tmp_path: Path) -> 
     assert gate["passed"] is True
 
 
+def test_repeated_command_on_unchanged_tree_is_rejected(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    request = TaskRequest(
+        repository_root=str(repository),
+        objective="Run validation once.",
+        scope=["src"],
+        acceptance_criteria=["The validation command passes."],
+        commands=[RepoCommand(command_id="validate", argv=[sys.executable, "-c", "pass"])],
+        required_command_ids=["validate"],
+        acknowledge_host_command_risk=True,
+    )
+    executor = ForgehandExecutor(
+        _config(tmp_path, repository), request, checkout=repository, task_root=tmp_path / "task"
+    )
+    executor.execute(1, WorkerAction(type="run_command", arguments={"command_id": "validate"}))
+    with pytest.raises(ValueError, match="same command was already run"):
+        executor.execute(2, WorkerAction(type="run_command", arguments={"command_id": "validate"}))
+
+
+def test_requires_changes_blocks_empty_success(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    request = TaskRequest(
+        repository_root=str(repository),
+        objective="Implement the change.",
+        scope=["src"],
+        acceptance_criteria=["The implementation is present."],
+        requires_changes=True,
+    )
+    executor = ForgehandExecutor(
+        _config(tmp_path, repository), request, checkout=repository, task_root=tmp_path / "task"
+    )
+    with pytest.raises(ValueError, match="at least one changed file"):
+        executor.execute(
+            1,
+            WorkerAction(type="complete", arguments={"status": "success", "summary": "Done."}),
+        )
+
+
 def test_fingerprint_tracks_untracked_content_but_ignores_ignored_files(tmp_path: Path) -> None:
     repository = _repository(tmp_path)
     (repository / ".gitignore").write_text("ignored.tmp\n", encoding="utf-8")

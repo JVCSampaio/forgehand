@@ -74,6 +74,7 @@ class ForgehandRuntime:
                     for command in request.commands
                 ],
                 "required_command_ids": request.required_command_ids,
+                "requires_changes": request.requires_changes,
                 "command_security": {
                     "shell": False,
                     "os_level_sandbox": False,
@@ -194,6 +195,7 @@ class ForgehandRuntime:
                     f"revision {revision}. Reinspect runtime facts before acting."
                 )
         invalid_attempts = 0
+        action_rejections = 0
         maximum_steps = min(
             request.max_iterations,
             self.config.forgehand.max_steps,
@@ -263,6 +265,7 @@ class ForgehandRuntime:
                 candidate = self._with_runtime_intent(candidate, action_result)
             except Exception as exc:
                 invalid_attempts += 1
+                action_rejections += 1
                 observation = f"ACTION_REJECTED: {type(exc).__name__}: {exc}"[
                     : self.config.forgehand.max_observation_chars
                 ]
@@ -275,6 +278,14 @@ class ForgehandRuntime:
                         "error": observation,
                     },
                 )
+                if action_rejections >= self.config.forgehand.max_action_rejections:
+                    return self._blocked(
+                        store,
+                        started,
+                        invalid_attempts,
+                        f"worker made {action_rejections} rejected actions without progress",
+                        executor=executor,
+                    )
                 continue
 
             revision = store.commit(

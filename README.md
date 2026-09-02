@@ -79,6 +79,10 @@ local-worker usage. It never presents those numbers as estimated Codex savings.
 - required command IDs must all exit zero before `success` is accepted;
 - common credential-bearing environment variables and interactive Git prompts are removed;
 - state, observation, output, steps, changed files, and retries have hard limits;
+- repeated commands on an unchanged tree are rejected, and action-rejection
+  budgets stop unproductive local loops early;
+- implementation contracts can set `requires_changes=true` so an empty diff
+  cannot be reported as success;
 - full logs and diffs stay local; compact receipts return to the supervisor;
 - Codex review is always required before integration.
 

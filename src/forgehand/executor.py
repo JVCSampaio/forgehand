@@ -62,6 +62,7 @@ class ForgehandExecutor:
         self.command_results: dict[str, dict[str, Any]] = {}
         self._repository_generation = 0
         self._complete_reads: dict[str, int] = {}
+        self._last_repeatable_action: tuple[str, str] | None = None
 
     def _in_scope(self, relative: str) -> bool:
         normalized = relative.replace("\\", "/").strip("/")
@@ -198,6 +199,18 @@ class ForgehandExecutor:
         arguments = action.arguments
         if not isinstance(arguments, dict):
             raise ValueError("action arguments must be an object")
+        if action.type == "run_command":
+            current_tree_hash = self._repository_fingerprint()
+            signature = json.dumps(
+                {"type": action.type, "arguments": arguments},
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            if self._last_repeatable_action == (signature, current_tree_hash):
+                raise ValueError(
+                    "the same command was already run on the unchanged repository; "
+                    "make a change or choose a different approved check"
+                )
         if action.type == "read_file" and isinstance(arguments.get("path"), str):
             target = self._resolve(arguments["path"])
             relative = target.relative_to(self.checkout).as_posix()
@@ -223,6 +236,11 @@ class ForgehandExecutor:
         if handler is None:  # pragma: no cover - guarded by the schema
             raise ValueError(f"unsupported action: {action.type}")
         result = handler(arguments)
+        if action.type == "run_command":
+            self._last_repeatable_action = (
+                signature,
+                result.get("validated_tree_hash", self._repository_fingerprint()),
+            )
         if (
             action.type == "read_file"
             and not result.get("truncated")
@@ -585,6 +603,12 @@ class ForgehandExecutor:
         if status not in {"success", "partial", "needs_review", "blocked"}:
             raise ValueError("completion status is invalid")
         gate = self.required_command_gate()
+        if status == "success" and self.request.requires_changes:
+            changed = [
+                line for line in _git(self.checkout, "status", "--short").splitlines() if line
+            ]
+            if not changed:
+                raise ValueError("success requires at least one changed file")
         if status == "success" and not gate["passed"]:
             problems = []
             if gate["missing_command_ids"]:

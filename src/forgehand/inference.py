@@ -43,6 +43,13 @@ State operations are limited to:
 
 Actions and required arguments:
 - complete: {status, summary, uncertainties?, acceptance_notes?}
+
+Efficiency rules:
+- Never repeat the same approved command while the repository is unchanged.
+- If an action is rejected, choose a different corrective action or complete with
+  needs_review; do not retry the identical payload.
+- For implementation contracts with requires_changes=true, success requires a
+  real scoped diff plus every required command passing on that exact tree.
 - list_files: {path, limit?}
 - read_file: {path, max_chars?, offset_chars?}
 - read_files: {paths, max_chars_each?} (batch up to 8 files within one observation budget)

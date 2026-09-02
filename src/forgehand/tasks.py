@@ -88,6 +88,7 @@ class TaskRunner:
             "acceptance_criteria": request.acceptance_criteria,
             "commands": [command.model_dump() for command in request.commands],
             "required_command_ids": request.required_command_ids,
+            "requires_changes": request.requires_changes,
             "acknowledge_host_command_risk": request.acknowledge_host_command_risk,
             "max_iterations": request.max_iterations,
             "limits": {
