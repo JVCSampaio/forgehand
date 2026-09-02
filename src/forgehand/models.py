@@ -142,6 +142,8 @@ class TaskRequest(BaseModel):
     commands: list[RepoCommand] = Field(default_factory=list, max_length=20)
     required_command_ids: list[str] = Field(default_factory=list, max_length=20)
     requires_changes: bool = False
+    edit_mode: Literal["free", "apply_patch_only"] = "free"
+    allowed_actions: list[str] | None = Field(default=None, max_length=20)
     acknowledge_host_command_risk: bool = False
     base_revision: str = Field(default="HEAD", min_length=1, max_length=200)
     max_iterations: int = Field(default=10, ge=1, le=100)
@@ -177,6 +179,19 @@ class TaskRequest(BaseModel):
                 "commands inherit host OS permissions and network access; set "
                 "acknowledge_host_command_risk=true after reviewing every argv"
             )
+        if self.allowed_actions is not None:
+            valid = set(WorkerAction.model_fields["type"].annotation.__args__)
+            unknown_actions = sorted(set(self.allowed_actions) - valid)
+            if unknown_actions:
+                raise ValueError(
+                    "allowed_actions contains unknown actions: " + ", ".join(unknown_actions)
+                )
+        if (
+            self.edit_mode == "apply_patch_only"
+            and self.allowed_actions is not None
+            and "apply_patch" not in self.allowed_actions
+        ):
+            raise ValueError("apply_patch_only requires apply_patch in allowed_actions")
         return self
 
 

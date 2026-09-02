@@ -200,6 +200,17 @@ class ForgehandExecutor:
         arguments = action.arguments
         if not isinstance(arguments, dict):
             raise ValueError("action arguments must be an object")
+        if (
+            self.request.allowed_actions is not None
+            and action.type not in self.request.allowed_actions
+        ):
+            raise PermissionError(f"action {action.type} is not allowed by the task contract")
+        if self.request.edit_mode == "apply_patch_only" and action.type in {
+            "replace_text",
+            "write_file",
+            "create_file",
+        }:
+            raise PermissionError("apply_patch_only requires the apply_patch action")
         if self.request.requires_changes and not internal:
             if not self._has_edit and action.type == "run_command" and self.command_results:
                 raise ValueError("only one pre-edit validation is permitted")
@@ -763,6 +774,10 @@ class ForgehandExecutor:
                 "apply_patch",
                 "run_command",
                 "inspect_diff",
+            ]
+        if self.request.allowed_actions is not None:
+            allowed_actions = [
+                item for item in allowed_actions if item in self.request.allowed_actions
             ]
         return {
             "step": step,

@@ -75,6 +75,8 @@ class ForgehandRuntime:
                 ],
                 "required_command_ids": request.required_command_ids,
                 "requires_changes": request.requires_changes,
+                "edit_mode": request.edit_mode,
+                "allowed_actions": request.allowed_actions,
                 "command_security": {
                     "shell": False,
                     "os_level_sandbox": False,
