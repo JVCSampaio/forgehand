@@ -15,6 +15,30 @@ local function toVector(t, default: Vector3): Vector3
 	return Vector3.new(t[1], t[2], t[3])
 end
 
+-- Big outlined label on both faces of a flat Block (meme signs).
+local function addText(part: BasePart, spec)
+	local color = spec.TextColor or { 255, 255, 255 }
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local gui = Instance.new("SurfaceGui")
+		gui.Name = "Label" .. face.Name
+		gui.Face = face
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 60
+		gui.LightInfluence = 0
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.Font = Enum.Font.FredokaOne
+		label.TextScaled = true
+		label.Text = spec.Text
+		label.TextColor3 = Color3.fromRGB(color[1], color[2], color[3])
+		label.TextStrokeColor3 = Color3.fromRGB(30, 30, 40)
+		label.TextStrokeTransparency = 0
+		label.Parent = gui
+		gui.Parent = part
+	end
+end
+
 local function makePart(spec, rarity: string): BasePart
 	local part: BasePart
 	local size = toVector(spec.Size, Vector3.one)
@@ -61,6 +85,9 @@ local function makePart(spec, rarity: string): BasePart
 	part.CastShadow = true
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
+	if spec.Text then
+		addText(part, spec)
+	end
 	return part
 end
 

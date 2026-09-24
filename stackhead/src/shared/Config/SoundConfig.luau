@@ -12,6 +12,8 @@ return {
 	Bump = { Id = "rbxasset://sounds/hit.wav", Volume = 0.7 },
 	Glue = { Id = "rbxasset://sounds/splat.wav", Volume = 0.7 },
 	Rare = { Id = "rbxasset://sounds/electronicpingshort.wav", Volume = 0.9, Pitch = 1.6 },
+	-- Meme item picked up. Ideal replacement: a squeaky rubber-duck honk.
+	Meme = { Id = "rbxasset://sounds/swoosh.wav", Volume = 0.8, Pitch = 1.8 },
 	Click = { Id = "rbxasset://sounds/clickfast.wav", Volume = 0.5 },
 	-- Wind loop; HUD drives its volume from the wobble meter.
 	Wobble = { Id = "rbxasset://sounds/action_falling.mp3", Volume = 0, Looped = true },

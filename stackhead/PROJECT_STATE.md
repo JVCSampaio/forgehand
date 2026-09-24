@@ -11,16 +11,16 @@ scattering the items as free loot. Design: `docs/DESIGN.md`. Economy: `docs/ECON
 
 - **4 worlds** (Stackville, Frostpeak, Candy Coast, Neon City), each an island with a bank and 4 rings; global tiers 1–16; every 4th Strength level opens a world; travel via WORLDS panel (validated), return to last world on respawn/rejoin
 - Code-generated maps: `src/server/World/Kit.luau` (floors, radial streets, bank, signs, water, obstacle map) + `Props.luau` + one theme per world
-- 68 items; Shiny/Golden rarities; zone respawns; loose loot; Item Rain; Golden Hour
+- 84 items (16 **meme items**, one per tier, with pickup toast + sound; text signs via SurfaceGui); Shiny/Golden rarities; zone respawns; loose loot; Item Rain; Golden Hour
 - Server-authoritative core loop: pickups, wobble, collapse, banking, dash bumps, glue
 - Upgrades: Speed, Reach, Balance (40 levels), Strength (16 levels, costs calibrated by the sim)
-- Daily streak, **3 daily orders** (TASKS panel), stack records to 999, 204-entry collection
+- Daily streak, **3 daily orders** (TASKS panel), stack records to 999, 252-entry collection
 - **Stack bases** (12 cosmetics under the stack, earned or bought), shop with starter pack, passes, products
 - Persistence: session-locked DataStore, retries, autosave, BindToClose, schema v2 + sanitize
 - Analytics funnel + economy/progression/custom events
 - Client: stack renderer (bases, lean), effects, HUD, menus (Upgrades, Worlds, Tasks, Shop), guide, per-world lighting + snow, input for touch/keyboard/gamepad
 - StreamingEnabled with atomic item models
-- Tooling: 58 Lune tests, pacing sim with cost calibration, place verifier, **visual preview** (`tools/preview/run.sh`), **marketing art** (`tools/art/run.sh` → `marketing/`)
+- Tooling: 60 Lune tests, pacing sim with cost calibration, place verifier, **visual preview** (`tools/preview/run.sh`), **marketing art** (`tools/art/run.sh` → `marketing/`), **item gallery** (`SHOTS=gallery tools/art/run.sh`)
 
 ## Verified
 
@@ -35,7 +35,7 @@ First Studio playtest (see Next tasks #1).
 ## Known issues
 
 - Never executed in the engine: expect small runtime issues on first playtest.
-- Sounds are engine placeholders; replace with licensed Creator Store audio.
+- Sounds are engine placeholders; replace with licensed Creator Store audio (the meme pickup wants a rubber-duck honk).
 - Speed hacks below 1.8× walk speed are not detected.
 - All four worlds are built at server start (~12k map parts); streaming keeps clients light, server memory untested at scale.
 - Hats/accessories can clip into the first stacked item.

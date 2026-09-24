@@ -30,6 +30,10 @@ async function shot(query, file, width, height) {
 if (only.includes('tower')) await shot('shot=tower', 'thumbnail-tower.png', 1920, 1080);
 if (only.includes('crash')) await shot('shot=crash', 'thumbnail-crash.png', 1920, 1080);
 if (only.includes('icon')) await shot('shot=icon', 'icon-1024.png', 1024, 1024);
+if (only.includes('gallery')) {
+  for (let t = 1; t <= 16; t += 2) await shot(`shot=gallery&sharp=1&from=${t}&to=${t + 1}`, `gallery-${t}-${t + 1}.png`, 1920, 1080);
+  await shot('shot=gallery&sharp=1&meme=1', 'gallery-memes.png', 1920, 1080);
+}
 if (only.includes('panels')) {
   for (const w of ['Stackville', 'Frostpeak', 'CandyCoast', 'NeonCity']) await shot(`shot=panel&world=${w}`, `panel-${w}.png`, 1920, 1080);
 }

@@ -323,6 +323,7 @@ local TOAST_COLORS = {
 	Broadcast = C.SubText,
 	Purchase = C.Purple,
 	Record = C.Gold,
+	Meme = Color3.fromRGB(255, 130, 220),
 	Info = C.Text,
 }
 
@@ -607,6 +608,22 @@ function HUD.init()
 		for _, milestone in info.Milestones or {} do
 			HUD.toast(string.format("🏆 %d STACK! Title: %s  +%d glue", milestone.Stack, milestone.Title, milestone.Glue), "Record")
 			Audio.play("Rare")
+		end
+	end)
+
+	-- Meme items get a shout-out on pickup: they are the "screenshot this" moments.
+	Remotes.PickedUp.OnClientEvent:Connect(function(list)
+		if typeof(list) ~= "table" then
+			return
+		end
+		for _, entry in list do
+			local code = typeof(entry) == "table" and entry[1]
+			if typeof(code) == "string" then
+				local def = ItemConfig.ById[StackCodec.parse(code)]
+				if def and def.Meme then
+					HUD.toast("😂 MEME: " .. def.Name .. "!", "Meme")
+				end
+			end
 		end
 	end)
 

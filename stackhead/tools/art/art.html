@@ -189,9 +189,25 @@ function partMesh(spec, rarity) {
   else if (spec.Shape === 'VCylinder') { geom = new THREE.CylinderGeometry(0.5, 0.5, 1, 40); size = [sx, sy, sz]; }
   else if (spec.Shape === 'HCylinder') { geom = GEOM.Cylinder; size = [sx, sy, sz]; }
   else if (spec.Shape === 'Wedge') { geom = GEOM.Wedge; size = [sx, sy, sz]; }
+  else if (params.get('sharp')) { geom = GEOM.Block; size = [sx, sy, sz]; }
   else { const r = Math.min(sx, sy, sz) * 0.14; geom = new RoundedBoxGeometry(sx, sy, sz, 3, r); size = [1, 1, 1]; }
   const mesh = new THREE.Mesh(geom, material(color, mat, spec.Transparency || 0, 0, opts));
   mesh.scale.set(...size);
+  if (spec.Text) {
+    const c = document.createElement('canvas'); c.width = 256; c.height = Math.max(64, Math.round(256 * sy / sx));
+    const g = c.getContext('2d');
+    g.font = `${Math.round(c.height * 0.72)}px 'Fredoka One'`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = c.height * 0.08; g.strokeStyle = '#1e1e28'; g.fillStyle = spec.TextColor ? `rgb(${spec.TextColor.join(',')})` : '#fff';
+    g.strokeText(spec.Text, c.width / 2, c.height / 2 + 4); g.fillText(spec.Text, c.width / 2, c.height / 2 + 4);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    for (const sideZ of [-1, 1]) {
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+      plane.position.z = sideZ * 0.51; if (sideZ > 0) plane.rotation.y = 0; else plane.rotation.y = Math.PI;
+      plane.scale.set(1 / Math.max(size[0], 1e-3) * sx, 1 / Math.max(size[1], 1e-3) * sy, 1);
+      if (size[0] === 1) plane.scale.set(sx, sy, 1), plane.position.z = sideZ * (sz / 2 + 0.01);
+      mesh.add(plane);
+    }
+  }
   const off = spec.Offset || [0, 0, 0];
   mesh.position.set(...off);
   const rot = spec.Rot || [0, 0, 0];
@@ -382,7 +398,7 @@ const SHOTS = {
     addWorld('Stackville', V(o, 0, 60), 420, [[camPos, hero.clone().add(V(0, 20, 0)), 6]]);
     const top = avatar({ pos: hero, yaw: 0.55, face: 'grin' });
     const codes = [...randomCodes([1, 2, 3, 4], 64, 5, 0.12)];
-    codes.splice(30, 0, 'pigg', 'carg'); codes.splice(12, 0, 'chsg');
+    codes.splice(30, 0, 'pigg', 'carg'); codes.splice(22, 0, 'dkkg'); codes.splice(12, 0, 'chsg'); codes.splice(5, 0, 'dck');
     const stackTop = buildStack(top, codes, [-1.6, 0.35], 'gold');
     avatar({ pos: V(o - 14, 0.45, 52), yaw: 1.2, shirt: [200, 40, 40], pants: [30, 40, 60], skin: [234, 184, 146], face: 'smile' });
     buildStack(V(o - 14, 5.75, 52), randomCodes([1, 2], 14, 9), [0.2, 0.05], 'pizza');
@@ -440,6 +456,37 @@ const SHOTS = {
     buildStack(top, randomCodes(tiers, 46, o + 3, 0.12), [0.9, -0.3], bases[name]);
     const cam = cameraAt(V(o + 2.5, 5, 22), V(o - 1, 21, 100), 62);
     render(cam, { focus: 22, bloom: name === 'NeonCity' ? 0.6 : 0.35 });
+  },
+  // Every item on a pedestal grid, labelled — for reviewing model quality.
+  gallery() {
+    const from = Number(params.get('from') || 1), to = Number(params.get('to') || 2);
+    const list = params.get('meme') ? catalog.Items.filter((i) => i.Meme) : catalog.Items.filter((i) => i.Tier >= from && i.Tier <= to);
+    world.background = skyTexture(['#5b6c93', '#7d8fb5', '#a9b7d3']);
+    world.add(new THREE.HemisphereLight(0xffffff, 0x6a6a80, 1.4));
+    const sun = new THREE.DirectionalLight(0xfff6ea, 2.6); sun.position.set(-20, 40, 35); sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40;
+    world.add(sun);
+    const cols = 6, gapX = 4.4, gapZ = 6.5;
+    const rows = Math.ceil(list.length / cols);
+    const cx = (cols - 1) * gapX / 2, cz = (rows - 1) * gapZ / 2;
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(cols * gapX + 4, 0.4, rows * gapZ + 4), new THREE.MeshStandardMaterial({ color: 0x9aa4bd, roughness: 0.95 }));
+    floor.position.set(cx, -0.2, cz); floor.receiveShadow = true; world.add(floor);
+    const cam = new THREE.PerspectiveCamera(32, W / H, 0.3, 1000);
+    cam.position.set(cx, 11 + rows * 3.2, cz + 17 + rows * 3.5); cam.lookAt(cx, 0.6, cz + 0.4); cam.updateMatrixWorld();
+    const labels = [];
+    list.forEach((item, i) => {
+      const x = (i % cols) * gapX, z = Math.floor(i / cols) * gapZ;
+      const it = itemGroup(item.Id + (params.get('rarity') || ''));
+      it.group.position.set(x, item.Height / 2, z);
+      it.group.rotation.y = Math.PI - 0.55;
+      world.add(it.group);
+      labels.push([item, new THREE.Vector3(x, 0, z + 1.9)]);
+    });
+    render(cam, { dof: false, bloom: 0.05, ao: true });
+    for (const [item, pos] of labels) {
+      const [x, y] = project(cam, pos);
+      html('div', 'tag', `${item.Meme ? '😂 ' : ''}${item.Name}<br><span style="font-size:16px">T${item.Tier} · ${item.Value} · h${item.Height}</span>`, { left: x - 110 + 'px', top: y + 'px', width: '220px', textAlign: 'center', fontSize: '24px', whiteSpace: 'normal', webkitTextStroke: '5px #2a1540' });
+    }
   },
   icon() {
     const o = WORLD_X.Stackville;

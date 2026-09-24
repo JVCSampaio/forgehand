@@ -8,6 +8,7 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local GameConfig = require(Shared.Config.GameConfig)
+local ItemConfig = require(Shared.Config.ItemConfig)
 local ItemBuilder = require(Shared.ItemBuilder)
 local StackCodec = require(Shared.StackCodec)
 local Remotes = require(Shared.Remotes)
@@ -234,9 +235,13 @@ function ItemFx.init()
 			local code, from = entry[1], entry[2]
 			if typeof(code) == "string" and typeof(from) == "Vector3" then
 				launch(code, from, stackTop, 0.28, 2)
-				local _, rarity = StackCodec.parse(code)
+				local id, rarity = StackCodec.parse(code)
 				if rarity ~= "" then
 					Audio.play("Rare")
+				end
+				local def = ItemConfig.ById[id]
+				if def and def.Meme then
+					Audio.play("Meme")
 				end
 				-- Rising pitch as the stack grows: the core "one more" sound.
 				local pitch = 0.8 + math.min(count - #list + i, 60) * 0.015

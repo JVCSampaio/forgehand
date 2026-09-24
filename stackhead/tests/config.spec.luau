@@ -19,6 +19,42 @@ T.describe("Config integrity", function()
 		end
 	end)
 
+	T.it("every tier has exactly one meme item, worth more and rarer than its neighbours", function()
+		for tier, items in ItemConfig.ByTier do
+			local memes, total, count, weight, memeWeight = 0, 0, 0, 0, 0
+			local meme
+			for _, item in items do
+				weight += item.Weight
+				if item.Meme then
+					memes += 1
+					meme = item
+					memeWeight += item.Weight
+				else
+					total += item.Value
+					count += 1
+				end
+			end
+			T.eq(memes, 1, "memes in tier " .. tier)
+			T.truthy(meme.Value > total / count, meme.Name .. " beats the tier average")
+			T.truthy(memeWeight / weight < 0.15, meme.Name .. " stays rare")
+		end
+	end)
+
+	T.it("part specs use known shapes and text only on blocks", function()
+		local shapes = { Block = true, Ball = true, Wedge = true, VCylinder = true, HCylinder = true }
+		for _, item in ItemConfig.Items do
+			for _, part in item.Parts do
+				T.truthy(shapes[part.Shape], item.Name .. " shape " .. tostring(part.Shape))
+				T.eq(#part.Size, 3, item.Name)
+				T.eq(#part.Color, 3, item.Name)
+				if part.Text then
+					T.eq(part.Shape, "Block", item.Name .. " text needs a flat face")
+					T.truthy(#part.Text <= 8, item.Name .. " text fits")
+				end
+			end
+		end
+	end)
+
 	T.it("rarity suffixes never collide with item ids and are single chars", function()
 		for _, rarity in GameConfig.Spawning.Rarities do
 			T.eq(#rarity.Suffix, 1)

@@ -137,7 +137,7 @@ tema por mundo. Um mundo novo custa um arquivo de tema e uma entrada em
 |---|---|
 | **Micro (segundos)** | cada item: som com pitch subindo, número na cabeça, multiplicador |
 | **Sessão (5–30 min)** | upgrades; Strength 2 desbloqueia a 2ª zona (~2 min bot / ~5 min humano); Strength 3 (~9 / ~20 min) |
-| **Meta (horas/dias)** | 4 mundos (Frostpeak ~2 h, Candy Coast ~5 h, Neon City ~9 h para um humano); **3 pedidos diários**; Balance com 40 níveis; coleção de 204 descobertas (68 itens × normal/shiny/golden) |
+| **Meta (horas/dias)** | 4 mundos (Frostpeak ~2 h, Candy Coast ~5 h, Neon City ~9 h para um humano); **3 pedidos diários**; Balance com 40 níveis; coleção de 252 descobertas (84 itens × normal/shiny/golden) |
 | **Aspiracional (semanas)** | recordes com títulos (10 → 999), 12 **bases de pilha** visíveis para todos (ganhas por recorde, mundo, sequência ou Robux), leaderboard global, itens golden (0,6%) |
 
 **Por que voltar amanhã:** três pedidos novos por dia (painel TASKS), sequência
@@ -171,6 +171,31 @@ toca no botão.
 - **Private servers:** baratos (sugestão 100 R$/mês) para empilhar com amigos sem esbarrões de estranhos.
 - **Premium:** +10% moedas e +1 glue diária (incentiva Premium Payouts por engajamento).
 - Preços iniciais seguem a faixa de 25–75 R$ recomendada por guias de 2026 para jogos novos; subir só depois de dados. Ativar a precificação gerenciada/regional da Roblox quando disponível.
+
+## 6c. Itens meme
+
+Cada tier tem **1 item meme** (16 no total): raro (peso ~5% do tier), vale
+~2× a média do tier e, ao ser pego, dispara um toast rosa *"😂 MEME: King
+Duck!"* e um som próprio. São os momentos de "tira print disso" e dão assunto
+para vídeos ("peguei o King Duck com 150 na cabeça").
+
+| Tier | Meme | Tier | Meme |
+|---|---|---|---|
+| 1 | Rubber Duck | 9 | Duct-Tape Banana (arte moderna) |
+| 2 | Banana for Scale | 10 | Fidget Spinner |
+| 3 | Cat Loaf | 11 | Bottle Flip |
+| 4 | Porcelain Throne | 12 | Stonks Arrow |
+| 5 | Chill Capybara (com laranja na cabeça) | 13 | Brainrot Brain (de óculos pixel) |
+| 6 | Pixel Shades | 14 | W Sign |
+| 7 | Pet Rock (olhinhos) | 15 | 6-7 Sign |
+| 8 | +1000 Aura | 16 | King Duck (coroa, peso mínimo) |
+
+Regra: só memes **genéricos** (conceitos e bordões, sem personagens, marcas
+ou imagens de terceiros), para não violar direitos autorais nem as regras da
+Roblox. Um teste garante 1 meme por tier, valor acima da média e raridade.
+
+Todos os 84 itens são revisados visualmente numa galeria renderizada dos
+modelos reais (`SHOTS=gallery tools/art/run.sh` → `build/art/out/gallery-*.png`).
 
 ## 9. MVP (o que está construído)
 
@@ -215,7 +240,8 @@ toca no botão.
 ## 13. Arte
 
 Low-poly de primitivas, cores saturadas, contorno de UI grosso, fonte
-FredokaOne. Cada tier tem uma cor de chão. Raridade é legível (shiny =
+FredokaOne. Cada tier tem uma cor de chão. Itens são montados com 3–15 primitivas
+(blocos, bolas, cunhas, cilindros), com placas de texto via SurfaceGui. Raridade é legível (shiny =
 vidro brilhante, golden = folha dourada + partículas). Nada de realismo.
 
 ## 14. Thumbnail / ícone

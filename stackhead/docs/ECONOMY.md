@@ -47,24 +47,24 @@ N exige Strength N; os níveis 5, 9 e 13 abrem um mundo novo.
 
 | tier | mundo | zona | valor médio | altura média | custo do Strength |
 |---|---|---|---|---|---|
-| 1 | Stackville | Market Street | 2 | 0.91 | — |
-| 2 | Stackville | Yard Sale | 8 | 1.84 | 690 |
-| 3 | Stackville | Old Farm | 21 | 1.75 | 4.1K |
-| 4 | Stackville | The Docks | 82 | 2.52 | 18K |
-| 5 | Frostpeak | Snowy Village | 213 | 1.13 | 99K |
-| 6 | Frostpeak | Ski Lodge | 605 | 1.24 | 1.4M |
-| 7 | Frostpeak | Ice Caves | 1.5K | 1.54 | 5.8M |
-| 8 | Frostpeak | The Summit | 4.3K | 2.02 | 8.4M |
-| 9 | Candy Coast | Sweet Street | 9.3K | 1.39 | 17M |
-| 10 | Candy Coast | Bakery Row | 25K | 1.72 | 91M |
-| 11 | Candy Coast | Sugar Beach | 67K | 1.34 | 270M |
-| 12 | Candy Coast | Candy Pier | 187K | 2.26 | 640M |
-| 13 | Neon City | Arcade Street | 433K | 0.96 | 900M |
-| 14 | Neon City | Tech Mall | 1.2M | 1.55 | 5.6B |
-| 15 | Neon City | Robot Factory | 3.1M | 2.37 | 21B |
-| 16 | Neon City | Skyline | 8.6M | 1.47 | 41B |
+| 1 | Stackville | Market Street | 2.7 | 0.92 | — |
+| 2 | Stackville | Yard Sale | 9.5 | 1.77 | 1K |
+| 3 | Stackville | Old Farm | 26 | 1.72 | 4.6K |
+| 4 | Stackville | The Docks | 139 | 2.30 | 20K |
+| 5 | Frostpeak | Snowy Village | 262 | 1.22 | 120K |
+| 6 | Frostpeak | Ski Lodge | 748 | 1.20 | 1.4M |
+| 7 | Frostpeak | Ice Caves | 1.9K | 1.48 | 5.9M |
+| 8 | Frostpeak | The Summit | 5.8K | 1.90 | 12M |
+| 9 | Candy Coast | Sweet Street | 11.5K | 1.23 | 18M |
+| 10 | Candy Coast | Bakery Row | 30K | 1.49 | 110M |
+| 11 | Candy Coast | Sugar Beach | 83K | 1.51 | 300M |
+| 12 | Candy Coast | Candy Pier | 252K | 2.22 | 660M |
+| 13 | Neon City | Arcade Street | 530K | 1.15 | 1B |
+| 14 | Neon City | Tech Mall | 1.5M | 1.85 | 5.1B |
+| 15 | Neon City | Robot Factory | 3.8M | 2.34 | 23B |
+| 16 | Neon City | Skyline | 12M | 1.55 | 46B |
 
-Os valores sobem ~2,6× por tier. Ao abrir um mundo, a renda salta (momento de
+Cada tier tem 5–6 itens, sendo 1 **item meme** (raro, vale ~2× a média do tier; ver DESIGN.md). Os valores sobem ~2,6× por tier. Ao abrir um mundo, a renda salta (momento de
 "uau"), e os custos seguintes foram calibrados para cada anel durar o tempo alvo.
 
 ## Outros sinks e fontes
@@ -77,7 +77,7 @@ Os valores sobem ~2,6× por tier. Ao abrir um mundo, a renda salta (momento de
 | Pedidos diários | 3/dia; recompensa = 120/200/350 × escala do tier (+1 glue no terceiro) |
 | Recompensa diária | 7 dias em ciclo, moedas × escala do tier |
 | Recordes | 10, 25, 50, 100, 200, 350, 500, 750, 999 itens → título + glue |
-| Coleção | 68 itens × 3 raridades = 204 descobertas, bônus de 3× o valor na primeira |
+| Coleção | 84 itens × 3 raridades = 252 descobertas, bônus de 3× o valor na primeira |
 
 ## Ritmo simulado
 
@@ -88,15 +88,14 @@ de bot em cada tier): 2, 7, 15, 30 | 12, 15, 20, 30 | 15, 18, 22, 35 | 18, 22, 2
 **O bot é um otimizador perfeito; humanos devem levar ~2–3× mais.**
 
 ```
-   0.2 min  First bank: 6 items, +58 coins
+   0.2 min  First bank: 6 items, +59 coins
    1.9 min  Strength 2 -> Yard Sale
-   9.1 min  Strength 3 -> Old Farm
-  25.5 min  Strength 4 -> The Docks
-  53.9 min  Strength 5 -> NEW WORLD Frostpeak
-  90.0 min  Strength 8 -> The Summit
- 133.3 min  Strength 9 -> NEW WORLD Candy Coast
- 221.1 min  Strength 13 -> NEW WORLD Neon City
- 289.9 min  Strength 16 -> Skyline
+   9.3 min  Strength 3 -> Old Farm
+  24.0 min  Strength 4 -> The Docks
+  54.1 min  Strength 5 -> NEW WORLD Frostpeak
+ 135.2 min  Strength 9 -> NEW WORLD Candy Coast
+ 222.9 min  Strength 13 -> NEW WORLD Neon City
+ 292.0 min  Strength 16 -> Skyline
 ```
 
 | marco | bot | humano estimado |
@@ -104,10 +103,10 @@ de bot em cada tier): 2, 7, 15, 30 | 12, 15, 20, 30 | 15, 18, 22, 35 | 18, 22, 2
 | 1ª recompensa | 12 s | ~30 s |
 | zona nova (Yard Sale) | 2 min | ~5 min |
 | 2º mundo (Frostpeak) | 54 min | ~2 h (sessão 2–3, dia 2) |
-| 3º mundo (Candy Coast) | 2,2 h | ~5 h (dias 3–5) |
+| 3º mundo (Candy Coast) | 2,3 h | ~5 h (dias 3–5) |
 | 4º mundo (Neon City) | 3,7 h | ~9 h (semana 1–2) |
-| todos os anéis | 4,8 h | ~12 h |
-| Balance 40, recorde 999, coleção 204 | muito além | semanas |
+| todos os anéis | 4,9 h | ~12 h |
+| Balance 40, recorde 999, coleção 252 | muito além | semanas |
 
 Suposições do modelo: zonas perto do teto de itens; taxa de coleta limitada a
 1,5 item/s; sem outros jogadores competindo e sem esbarrões.
