@@ -31,6 +31,7 @@ type Render = {
 	Visible: boolean,
 	LastTop: CFrame?,
 	Base: RenderItem?,
+	Proxies: { RenderItem },
 }
 
 local localPlayer = Players.LocalPlayer
@@ -43,7 +44,8 @@ local DAMPING = 7
 local ACCEL_GAIN = 0.0016
 local MAX_LEAN = 0.9
 
-function StackRenderer.onItemsRemoved(callback: (Player, { { Code: string, CFrame: CFrame } }) -> ())
+-- Removed entries are top first; a proxy entry stands for Count items.
+function StackRenderer.onItemsRemoved(callback: (Player, { { Code: string, CFrame: CFrame, Count: number } }) -> ())
 	table.insert(removedCallbacks, callback)
 end
 
@@ -73,8 +75,85 @@ local function buildItem(code: string, index: number, isLocal: boolean): RenderI
 		end
 	end
 	-- Deterministic per-slot yaw so stacks look hand-piled, not machine-made.
-	local yaw = CFrame.Angles(0, math.rad(((index * 137) % 60) - 30), 0)
+	-- Fronts face backwards: the owner's camera sits behind them, and that is
+	-- the view players see and screenshot (duck faces, meme signs).
+	local yaw = CFrame.Angles(0, math.pi + math.rad(((index * 137) % 60) - 30), 0)
 	return { Code = code, Model = model, Parts = parts, Offsets = offsets, Height = def.Height, Yaw = yaw }
+end
+
+local GOLD = Color3.fromRGB(255, 196, 40)
+
+-- One plain part standing in for several items above the detail cap. Width
+-- and colour come from the first item so the tower keeps its stripes.
+local function buildProxy(codes: { string }, first: number, last: number, isLocal: boolean): RenderItem
+	local height = 0
+	for i = first, last do
+		local def = ItemBuilder.definition(codes[i])
+		height += if def then def.Height else 1
+	end
+	local def = ItemBuilder.definition(codes[first])
+	local spec = def and def.Parts[1]
+	local _, rarity = StackCodec.parse(codes[first])
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = isLocal
+	part.Material = Enum.Material.SmoothPlastic
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	part.Color = if rarity == "g"
+		then GOLD
+		elseif spec then Color3.fromRGB(spec.Color[1], spec.Color[2], spec.Color[3])
+		else Color3.new(1, 1, 1)
+	local width = if spec then math.clamp(math.max(spec.Size[1], spec.Size[3]), 1, 1.8) else 1.4
+	part.Size = Vector3.new(width, height, width)
+	local model = Instance.new("Model")
+	model.Name = "Proxy"
+	part.Parent = model
+	return {
+		Code = table.concat(codes, ",", first, last),
+		Model = model,
+		Parts = { part },
+		Offsets = { CFrame.identity },
+		Height = height,
+		Yaw = CFrame.Angles(0, math.rad(((first * 137) % 60) - 30), 0),
+	}
+end
+
+type Removed = { Code: string, CFrame: CFrame, Count: number }
+
+-- Returns proxies cut off the top (top first), for collapse/bank effects.
+local function syncProxies(render: Render, codes: { string }, cap: number, isLocal: boolean): { Removed }
+	local group = if isLocal then GameConfig.Render.ProxyGroupLocal else GameConfig.Render.ProxyGroupOthers
+	local index = 0
+	for first = cap + 1, #codes, group do
+		index += 1
+		local last = math.min(first + group - 1, #codes)
+		local existing = render.Proxies[index]
+		if not existing or existing.Code ~= table.concat(codes, ",", first, last) then
+			if existing then
+				destroyItem(existing)
+			end
+			local proxy = buildProxy(codes, first, last, isLocal)
+			proxy.Model.Parent = render.Folder
+			render.Proxies[index] = proxy
+		end
+	end
+	local removed = {}
+	for i = #render.Proxies, index + 1, -1 do
+		local proxy = render.Proxies[i]
+		local _, commas = string.gsub(proxy.Code, ",", "")
+		table.insert(removed, {
+			Code = string.match(proxy.Code, "^[^,]+") or proxy.Code,
+			CFrame = proxy.Parts[1].CFrame,
+			Count = commas + 1,
+		})
+		destroyItem(proxy)
+		render.Proxies[i] = nil
+	end
+	return removed
 end
 
 local function sync(render: Render)
@@ -92,16 +171,16 @@ local function sync(render: Render)
 		keep = i
 	end
 
-	if #render.Items > keep then
-		local removed = {}
-		for i = #render.Items, keep + 1, -1 do
-			local item = render.Items[i]
-			if item.Parts[1] then
-				table.insert(removed, { Code = item.Code, CFrame = item.Parts[1].CFrame })
-			end
-			destroyItem(item)
-			render.Items[i] = nil
+	local removed = syncProxies(render, codes, cap, isLocal)
+	for i = #render.Items, keep + 1, -1 do
+		local item = render.Items[i]
+		if item.Parts[1] then
+			table.insert(removed, { Code = item.Code, CFrame = item.Parts[1].CFrame, Count = 1 })
 		end
+		destroyItem(item)
+		render.Items[i] = nil
+	end
+	if #removed > 0 then
 		for _, callback in removedCallbacks do
 			task.spawn(callback, render.Player, removed)
 		end
@@ -200,6 +279,7 @@ local function addPlayer(player: Player)
 		Anchor = anchor,
 		Visible = true,
 		LastTop = nil,
+		Proxies = {},
 	}
 	renders[player] = render
 	player:GetAttributeChangedSignal("Stack"):Connect(function()
@@ -269,6 +349,9 @@ local function step(dt: number)
 		for _, item in render.Items do
 			totalHeight += item.Height
 		end
+		for _, item in render.Proxies do
+			totalHeight += item.Height
+		end
 		-- Lean is spread along the height so the stack bends like a noodle.
 		local perStud = lean / math.max(totalHeight, 12)
 
@@ -283,15 +366,17 @@ local function step(dt: number)
 			end
 			cfWorldTilt = cfWorldTilt * CFrame.new(0, base.Height, 0)
 		end
-		for _, item in render.Items do
-			local h = item.Height
-			cfWorldTilt = cfWorldTilt * CFrame.Angles(perStud.Y * h, 0, -perStud.X * h)
-			local center = (cfWorldTilt * CFrame.new(0, h / 2, 0)) * yawOnly * item.Yaw
-			for i, part in item.Parts do
-				table.insert(parts, part)
-				table.insert(cframes, center * item.Offsets[i])
+		for _, list in { render.Items, render.Proxies } do
+			for _, item in list do
+				local h = item.Height
+				cfWorldTilt = cfWorldTilt * CFrame.Angles(perStud.Y * h, 0, -perStud.X * h)
+				local center = (cfWorldTilt * CFrame.new(0, h / 2, 0)) * yawOnly * item.Yaw
+				for i, part in item.Parts do
+					table.insert(parts, part)
+					table.insert(cframes, center * item.Offsets[i])
+				end
+				cfWorldTilt = cfWorldTilt * CFrame.new(0, h, 0)
 			end
-			cfWorldTilt = cfWorldTilt * CFrame.new(0, h, 0)
 		end
 		render.LastTop = cfWorldTilt
 		table.insert(parts, render.Anchor)

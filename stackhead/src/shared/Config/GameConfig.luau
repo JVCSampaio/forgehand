@@ -108,9 +108,16 @@ GameConfig.Loose = {
 
 GameConfig.Movement = {
 	BaseWalkSpeed = 16,
-	-- Server rejects pickups during ticks faster than this multiple of the
-	-- allowed speed (teleports / speed hacks).
+	-- Allowed horizontal speed = WalkSpeed x this (+ dash impulse).
 	SpeedTolerance = 1.8,
+	-- Server movement budget (src/server/Util/MoveGuard.luau). Moves that
+	-- overdraw it are rejected and the character is snapped back.
+	Guard = {
+		BurstSeconds = 1, -- lag catch-up allowance
+		Slack = 6, -- studs of replication jitter
+		GiveUpSeconds = 3, -- then accept the spot but drop the whole stack
+		SpawnGrace = 1, -- after spawns / server teleports, accept any position
+	},
 }
 
 GameConfig.Camera = {
@@ -138,8 +145,13 @@ GameConfig.Leaderboard = {
 }
 
 GameConfig.Render = {
+	-- Fully modelled items per stack. Items above this are drawn as simple
+	-- one-part segments (ProxyGroup items each) so a 999 tower still looks
+	-- 999 tall: ~120 extra parts locally instead of ~2000.
 	MaxItemsLocal = 320,
 	MaxItemsOthers = 160,
+	ProxyGroupLocal = 6,
+	ProxyGroupOthers = 10,
 	-- Other players' stacks further than this are not rendered.
 	OtherRenderDistance = 450,
 }

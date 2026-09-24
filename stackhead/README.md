@@ -7,6 +7,7 @@ wobbles too much and comes crashing down for everyone else to grab.
 - Design and market notes: [`docs/DESIGN.md`](docs/DESIGN.md)
 - Economy model: [`docs/ECONOMY.md`](docs/ECONOMY.md)
 - Monetization strategy: [`docs/MONETIZATION.md`](docs/MONETIZATION.md)
+- Playtest and launch checklist: [`docs/PLAYTEST.md`](docs/PLAYTEST.md)
 - Store art: [`marketing/`](marketing/)
 - Handoff state: [`PROJECT_STATE.md`](PROJECT_STATE.md)
 
@@ -39,6 +40,7 @@ lune run tests/runner.luau                               # unit tests (pure modu
 lune run tools/economy_sim.luau                          # pacing model with the real configs
 rojo build default.project.json -o build/Stackhead.rbxl
 lune run tools/verify_place.luau build/Stackhead.rbxl    # scripts, remotes, require paths
+lune run tools/launch_check.luau                         # what is still unset before launch
 stylua --check src tests tools
 ```
 

@@ -51,6 +51,7 @@ local function place(player: Player, worldId: string): boolean
 		return false
 	end
 	character:PivotTo(target)
+	StackService.allowTeleport(player, target.Position)
 	return true
 end
 
@@ -63,9 +64,10 @@ function TravelService.travel(player: Player, worldId: unknown): (boolean, strin
 	if not world or not profile then
 		return false, "invalid"
 	end
-	if not WorldIndex:isUnlocked(world, profile.Upgrades.Strength) then
-		return false, "locked"
-	end
+	-- Locked worlds can be visited to look around: nothing there can be
+	-- lifted until Strength reaches the world's first tier (canPickUp), so
+	-- visiting shows the variety early without skipping any progression.
+	local visiting = not WorldIndex:isUnlocked(world, profile.Upgrades.Strength)
 	local now = os.clock()
 	if now - (lastTravel[player] or -math.huge) < GameConfig.Travel.Cooldown then
 		return false, "cooldown"
@@ -79,7 +81,15 @@ function TravelService.travel(player: Player, worldId: unknown): (boolean, strin
 		return false, "failed"
 	end
 	profile.LastWorld = world.Id
-	Analytics.custom(player, "Travel_" .. world.Id)
+	if visiting then
+		Remotes.Notify:FireClient(player, {
+			Kind = "Event",
+			Text = string.format("👀 Visiting %s! Items here need 💪 Strength %d.", world.DisplayName, world.FirstTier),
+		})
+		Analytics.custom(player, "Visit_" .. world.Id)
+	else
+		Analytics.custom(player, "Travel_" .. world.Id)
+	end
 	DataService.changed(player)
 	return true
 end
@@ -93,7 +103,6 @@ function TravelService.init()
 		if not ok then
 			local text = if reason == "stack"
 				then "Bank your stack before travelling!"
-				elseif reason == "locked" then "That world is still locked. Keep upgrading Strength!"
 				elseif reason == "cooldown" then "Hold on, still travelling…"
 				else nil
 			if text then

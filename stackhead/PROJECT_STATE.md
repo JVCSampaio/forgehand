@@ -13,6 +13,9 @@ scattering the items as free loot. Design: `docs/DESIGN.md`. Economy: `docs/ECON
 - Code-generated maps: `src/server/World/Kit.luau` (floors, radial streets, bank, signs, water, obstacle map) + `Props.luau` + one theme per world
 - 84 items (16 **meme items**, one per tier, with pickup toast + sound; text signs via SurfaceGui); Shiny/Golden rarities; zone respawns; loose loot; Item Rain; Golden Hour
 - Server-authoritative core loop: pickups, wobble, collapse, banking, dash bumps, glue
+- **Movement validation** (`Util/MoveGuard`): distance budget per player; warps are snapped back and bank/pickups/bumps only ever see accepted positions (fixes teleport-to-bank payouts); sanctioned server moves call `StackService.allowTeleport`
+- Tall towers: above `Render.MaxItemsLocal/Others` items render as one-part segments so a 999 stack still looks 999 tall; big collapses show the non-loot top as client-side debris
+- Locked worlds can be **visited** (👀 VISIT) to show variety early; nothing there can be lifted until Strength allows
 - Upgrades: Speed, Reach, Balance (40 levels), Strength (16 levels, costs calibrated by the sim)
 - Daily streak, **3 daily orders** (TASKS panel), stack records to 999, 252-entry collection
 - **Stack bases** (12 cosmetics under the stack, earned or bought), shop with starter pack, passes, products
@@ -20,7 +23,7 @@ scattering the items as free loot. Design: `docs/DESIGN.md`. Economy: `docs/ECON
 - Analytics funnel + economy/progression/custom events
 - Client: stack renderer (bases, lean), effects, HUD, menus (Upgrades, Worlds, Tasks, Shop), guide, per-world lighting + snow, input for touch/keyboard/gamepad
 - StreamingEnabled with atomic item models
-- Tooling: 60 Lune tests, pacing sim with cost calibration, place verifier, **visual preview** (`tools/preview/run.sh`), **marketing art** (`tools/art/run.sh` → `marketing/`), **item gallery** (`SHOTS=gallery tools/art/run.sh`)
+- Tooling: 67 Lune tests, `tools/launch_check.luau` (unset product ids, placeholder sounds), Studio-only `ServerStorage.StackheadDebug.Fill` for tall-stack tests, pacing sim with cost calibration, place verifier, **visual preview** (`tools/preview/run.sh`), **marketing art** (`tools/art/run.sh` → `marketing/`), **item gallery** (`SHOTS=gallery tools/art/run.sh`)
 
 ## Verified
 
@@ -30,7 +33,8 @@ generators. **Not yet run inside Roblox Studio.**
 
 ## Current task
 
-First Studio playtest (see Next tasks #1).
+First Studio playtest: follow `docs/PLAYTEST.md` (solo, teleport exploit repro,
+multiplayer, mobile, 10-minute new-player test). No paid promotion before that.
 
 ## Known issues
 
@@ -39,14 +43,15 @@ First Studio playtest (see Next tasks #1).
 - Speed hacks below 1.8× walk speed are not detected.
 - All four worlds are built at server start (~12k map parts); streaming keeps clients light, server memory untested at scale.
 - Hats/accessories can clip into the first stacked item.
+- MoveGuard, tower segments and collapse debris are untested in the engine (see PLAYTEST.md §1–2).
 - No settings menu (music/SFX toggles exist in save data only).
 
 ## Next tasks
 
-1. Studio: `rojo build` → open `build/Stackhead.rbxl` → Play; then Test → Clients and Servers (2–3 players): bumps, loot, rain, travel, orders, bases.
-2. Tune `GameConfig.Wobble` by feel; keep the sim in sync.
-3. Create passes/products on the Creator Dashboard; paste ids into `MonetizationConfig`.
-4. Replace placeholder sounds; upload `marketing/` icon + thumbnails.
+1. Run `docs/PLAYTEST.md` sections 1–5 and fix what breaks.
+2. Tune `GameConfig.Wobble` by feel; if testers mostly stand and wait, try the counterbalance experiment described there. Keep the sim in sync.
+3. Create passes/products on the Creator Dashboard; paste ids into `MonetizationConfig` (`lune run tools/launch_check.luau`).
+4. Replace placeholder sounds (pickup, near-fall wind, bank, collapse first); upload `marketing/` icon + thumbnails (crash first).
 5. Stack Pass (season track tied to orders) — see docs/MONETIZATION.md.
 6. Settings menu (SFX/music, reduced camera shake).
 
@@ -56,7 +61,7 @@ First Studio playtest (see Next tasks #1).
 - **Global tiers**: item Tier = Strength level needed; zones map 1:1 to tiers across worlds.
 - **Pure modules** (`Economy`, `Wobble`, `Orders`, `Cosmetics`, `Worlds`, `StackCodec`, `Format`, `PlayerDataSchema`, `SessionStore`, `RateLimiter`, `MemoryStore`) have no Roblox API calls so Lune can test and simulate them. Keep it that way.
 - **Server owns every reward.** Clients only send intent: `Dash`, `UseGlue(bool)`, `ClaimDaily`, `BuyUpgrade(id)`, `Travel(worldId)`, `ClaimOrder(i)`, `EquipCosmetic(id)`. All rate limited and validated.
-- **Stacks replicate as a string attribute** (`Player.Stack`, codes like `pigg`), rendered client-side; nothing physical is welded to characters.
+- **Stacks replicate as a string attribute** (`Player.Stack`, codes like `pigg`), rendered client-side; nothing physical is welded to characters. Stacked items face backwards (toward the owner's camera).
 - **Loose/rain items** carry `DropFrom`/`DropAt` attributes; clients animate the fall, server blocks pickup until `DropAt`.
 - **Session lock**: a profile can be written only by the server holding its lock; released profiles can't be re-locked by late autosaves.
 - **Receipts**: grant → record PurchaseId → force save → only then `PurchaseGranted`.

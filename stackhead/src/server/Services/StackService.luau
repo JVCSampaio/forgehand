@@ -11,12 +11,14 @@ local Workspace = game:GetService("Workspace")
 local Shared = game:GetService("ReplicatedStorage").Shared
 local GameConfig = require(Shared.Config.GameConfig)
 local EconomyConfig = require(Shared.Config.EconomyConfig)
+local ItemConfig = require(Shared.Config.ItemConfig)
 local Economy = require(Shared.Economy)
 local Wobble = require(Shared.Wobble)
 local StackCodec = require(Shared.StackCodec)
 local Remotes = require(Shared.Remotes)
 local WorldIndex = require(Shared.WorldIndex)
 local RateLimiter = require(script.Parent.Parent.Util.RateLimiter)
+local MoveGuard = require(script.Parent.Parent.Util.MoveGuard)
 local DataService = require(script.Parent.DataService)
 local ItemSpawnService = require(script.Parent.ItemSpawnService)
 local MonetizationService = require(script.Parent.MonetizationService)
@@ -43,6 +45,9 @@ type PlayerState = {
 	InBank: boolean,
 	LastPos: Vector3?,
 	LastImplausible: number,
+	Guard: MoveGuard.MoveGuard,
+	Rejecting: boolean,
+	MoveGraceUntil: number,
 	Dirty: boolean,
 	LastWobbleSent: number,
 	Picked: { any },
@@ -67,6 +72,9 @@ local function newState(): PlayerState
 		InBank = false,
 		LastPos = nil,
 		LastImplausible = -math.huge,
+		Guard = MoveGuard.new(GameConfig.Movement.Guard),
+		Rejecting = false,
+		MoveGraceUntil = 0,
 		Dirty = true,
 		LastWobbleSent = -1,
 		Picked = {},
@@ -80,6 +88,18 @@ end
 
 function StackService.getState(player: Player): PlayerState?
 	return states[player]
+end
+
+-- Call after the server itself moves a character (spawn pads, travel) so the
+-- jump isn't treated as a teleport.
+function StackService.allowTeleport(player: Player, position: Vector3)
+	local state = states[player]
+	if state then
+		state.Guard:reset(position)
+		state.LastPos = position
+		-- The client may still replicate its old spot for a moment.
+		state.MoveGraceUntil = os.clock() + GameConfig.Movement.Guard.SpawnGrace
+	end
 end
 
 -- Every world has a bank at its centre.
@@ -99,6 +119,27 @@ local function recomputeHeight(state: PlayerState)
 		height += entry.Height
 	end
 	state.Height = height
+end
+
+-- Studio-only playtest helper. From the Command Bar (server view):
+--   game.ServerStorage.StackheadDebug.Fill:Invoke(game.Players.Player1, 400)
+-- Instantly stacks `count` random items the player could lift, to test tall
+-- tower rendering, wobble at height and big collapses without farming.
+function StackService.debugFill(player: Player, count: number)
+	assert(RunService:IsStudio(), "debugFill is Studio-only")
+	local state = states[player]
+	local profile = DataService.getProfile(player)
+	assert(state and profile, "player not loaded")
+	local strength = StatsService.strength(profile)
+	for _ = 1, math.min(count, MAX_STACK - #state.Codes) do
+		local pool = ItemConfig.ByTier[math.random(1, strength)]
+		local def = pool[math.random(1, #pool)]
+		table.insert(state.Codes, StackCodec.code(def.Id, ""))
+		table.insert(state.Entries, { Value = def.Value, RarityMult = 1, Height = def.Height })
+	end
+	recomputeHeight(state)
+	state.GraceUntil = os.clock() + 3
+	state.Dirty = true
 end
 
 local function notify(player: Player, kind: string, text: string)
@@ -325,27 +366,40 @@ local function tickPlayer(player: Player, state: PlayerState, dt: number, now: n
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not profile or not root or not humanoid or humanoid.Health <= 0 then
 		state.LastPos = nil
+		state.Guard:reset(nil)
 		return
 	end
 
-	local position = root.Position
 	local velocity = root.AssemblyLinearVelocity
-	local plausible = true
-	if state.LastPos then
+	local dashing = now - state.LastDash < 1
+	local allowedSpeed = humanoid.WalkSpeed * GameConfig.Movement.SpeedTolerance + (if dashing then DASH_CFG.Impulse else 0)
+	-- Everything below (bank, pickups, bumps) uses the last *accepted*
+	-- position, never the raw one, so warping to the bank pays nothing.
+	if now < state.MoveGraceUntil then
+		-- Spawning / server teleports settle first: accept wherever they land.
+		state.Guard:reset(root.Position)
+	end
+	local verdict = state.Guard:check(root.Position, dt, allowedSpeed)
+	local position = state.Guard:position() or root.Position
+	local plausible = verdict == "ok"
+	if verdict == "rejected" then
+		state.LastImplausible = now
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.CFrame = CFrame.new(position) * root.CFrame.Rotation
+		velocity = Vector3.zero
+	elseif verdict == "forced" then
+		-- Couldn't pull them back: keep the new spot but nothing carried there.
+		state.LastImplausible = now
+		collapse(player, state, profile, 0)
+	end
+	if state.LastPos and plausible then
 		-- The client owns its character physics, so a spoofed "zero velocity"
 		-- could dodge wobble. Fall back to measured movement when they disagree.
 		local measured = (position - state.LastPos) / dt
 		if (measured - velocity).Magnitude > 12 then
 			velocity = measured
 		end
-		local moved = Vector2.new(position.X - state.LastPos.X, position.Z - state.LastPos.Z).Magnitude
-		local dashing = now - state.LastDash < 1
-		local allowedSpeed = humanoid.WalkSpeed * GameConfig.Movement.SpeedTolerance + (if dashing then DASH_CFG.Impulse else 0)
-		plausible = moved <= allowedSpeed * dt + 3
-		if not plausible then
-			state.LastImplausible = now
-		end
-	else
+	elseif not state.LastPos then
 		-- First tick after spawning: don't count spawn velocity as a disturbance.
 		state.Wobble.VelX, state.Wobble.VelY, state.Wobble.VelZ = velocity.X, velocity.Y, velocity.Z
 	end
@@ -375,8 +429,8 @@ local function tickPlayer(player: Player, state: PlayerState, dt: number, now: n
 		else
 			state.Wobble.VelX, state.Wobble.VelY, state.Wobble.VelZ = velocity.X, velocity.Y, velocity.Z
 		end
-		if not plausible then
-			-- Teleports and speed hacks shake the stack instead of paying out.
+		if verdict == "rejected" and not state.Rejecting then
+			-- Once per incident: a warp attempt also shakes the stack.
 			Wobble.kick(state.Wobble, 0.5, state.Height, balance, WOBBLE_CFG)
 		end
 		if state.Wobble.Value >= 1 then
@@ -387,6 +441,8 @@ local function tickPlayer(player: Player, state: PlayerState, dt: number, now: n
 			checkBumps(player, state, position, now)
 		end
 	end
+
+	state.Rejecting = verdict == "rejected"
 
 	if state.Dirty then
 		state.Dirty = false
@@ -419,6 +475,8 @@ local function onPlayerAdded(player: Player)
 			state.Height = 0
 			state.Wobble = Wobble.newState()
 			state.LastPos = nil
+			state.Guard:reset(nil)
+			state.MoveGraceUntil = os.clock() + GameConfig.Movement.Guard.SpawnGrace
 			state.Dirty = true
 		end
 		local humanoid = character:WaitForChild("Humanoid", 10) :: Humanoid?
@@ -439,6 +497,18 @@ local function onPlayerAdded(player: Player)
 end
 
 function StackService.init()
+	if RunService:IsStudio() then
+		local folder = Instance.new("Folder")
+		folder.Name = "StackheadDebug"
+		local fill = Instance.new("BindableFunction")
+		fill.Name = "Fill"
+		fill.OnInvoke = function(player: Player, count: number)
+			StackService.debugFill(player, count)
+			return #(states[player] and states[player].Codes or {})
+		end
+		fill.Parent = folder
+		folder.Parent = game:GetService("ServerStorage")
+	end
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	for _, player in Players:GetPlayers() do
 		onPlayerAdded(player)

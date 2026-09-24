@@ -57,6 +57,9 @@ function UpgradeService.buy(player: Player, upgradeId: unknown): (boolean, any)
 		elseif zone then
 			Remotes.Notify:FireClient(player, { Kind = "Unlock", Text = zone.DisplayName .. " unlocked! Heavier items = more coins." })
 		end
+		if level + 1 == 3 then
+			Remotes.Notify:FireClient(player, { Kind = "Event", Text = "👀 Tip: open 🌍 WORLDS to peek at the other worlds!" })
+		end
 	end
 	DataService.changed(player)
 	return true, level + 1

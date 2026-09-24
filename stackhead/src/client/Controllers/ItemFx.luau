@@ -33,13 +33,16 @@ type Flight = {
 	DestroyAtEnd: boolean,
 	Model: Model,
 	Final: { CFrame }?,
+	FallIn: boolean?,
+	Linger: number?,
 }
 
 local flights: { Flight } = {}
 local fxFolder: Folder
 local shakeUntil = 0
 local shakeStrength = 0
-local MAX_FLIGHTS = 80
+local MAX_FLIGHTS = 150
+local MAX_DEBRIS = 70
 
 local function partsOf(model: Model): ({ BasePart }, { CFrame })
 	local parts, offsets = {}, {}
@@ -53,7 +56,9 @@ local function partsOf(model: Model): ({ BasePart }, { CFrame })
 	return parts, offsets
 end
 
-local function launch(code: string, from: Vector3, to: () -> Vector3, duration: number, arc: number)
+-- fallIn: accelerate like gravity instead of easing out; linger: seconds to
+-- rest where it landed before disappearing (collapse debris).
+local function launch(code: string, from: Vector3, to: () -> Vector3, duration: number, arc: number, fallIn: boolean?, linger: number?)
 	if #flights >= MAX_FLIGHTS then
 		return
 	end
@@ -74,6 +79,8 @@ local function launch(code: string, from: Vector3, to: () -> Vector3, duration: 
 		Spin = math.random() * 8 - 4,
 		DestroyAtEnd = true,
 		Model = model,
+		FallIn = fallIn,
+		Linger = linger,
 	})
 end
 
@@ -132,7 +139,17 @@ local function updateFlights()
 		local t = math.clamp((now - flight.Start) / flight.Duration, 0, 1)
 		if t >= 1 or not flight.Model.Parent then
 			table.remove(flights, index)
-			if flight.DestroyAtEnd then
+			if flight.DestroyAtEnd and flight.Linger and flight.Model.Parent then
+				local landed = CFrame.new(flight.To()) * CFrame.Angles(flight.Spin, flight.Spin * 0.7, 0)
+				for i, part in flight.Parts do
+					table.insert(parts, part)
+					table.insert(cframes, landed * flight.Offsets[i])
+				end
+				local model = flight.Model
+				task.delay(flight.Linger, function()
+					model:Destroy()
+				end)
+			elseif flight.DestroyAtEnd then
 				flight.Model:Destroy()
 			elseif flight.Final and flight.Model.Parent then
 				for i, part in flight.Parts do
@@ -142,7 +159,7 @@ local function updateFlights()
 			end
 		else
 			local target = flight.To()
-			local eased = if flight.DestroyAtEnd then 1 - (1 - t) ^ 2 else t * t
+			local eased = if flight.DestroyAtEnd and not flight.FallIn then 1 - (1 - t) ^ 2 else t * t
 			local position = flight.From:Lerp(target, eased) + Vector3.new(0, math.sin(t * math.pi) * flight.Arc, 0)
 			local center = CFrame.new(position) * CFrame.Angles(t * flight.Spin, t * flight.Spin * 0.7, 0)
 			for i, part in flight.Parts do
@@ -196,14 +213,44 @@ local function stackTop(): Vector3
 	return if head then head.Position + Vector3.new(0, 1, 0) else Vector3.zero
 end
 
-local function nearBank(): boolean
-	local character = localPlayer.Character
+local function nearBank(player: Player): boolean
+	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if not root then
 		return false
 	end
 	local offset = root.Position - WorldIndex:at(root.Position).Origin
 	return Vector2.new(offset.X, offset.Z).Magnitude < GameConfig.Bank.Radius + 6
+end
+
+-- The server turns the lowest Loose.MaxPerCollapse fallen items into loot
+-- (those animate via animateDrop). Everything above them would just vanish,
+-- so draw it tumbling off the tower here: a 300 stack should look like 300.
+local function tumble(removed: { { Code: string, CFrame: CFrame, Count: number } })
+	local covered = 0
+	local lootFrom = #removed + 1
+	while lootFrom > 1 and covered < GameConfig.Loose.MaxPerCollapse do
+		lootFrom -= 1
+		covered += removed[lootFrom].Count
+	end
+	local debris = math.min(lootFrom - 1, MAX_DEBRIS)
+	for i = 1, debris do
+		local entry = removed[i]
+		local from = entry.CFrame.Position
+		local angle = math.random() * math.pi * 2
+		local distance = 8 + math.random() * 22
+		local ground = Vector3.new(
+			from.X + math.cos(angle) * distance,
+			GameConfig.Layout.GroundY + 0.8,
+			from.Z + math.sin(angle) * distance
+		)
+		local fall = math.clamp(math.sqrt(2 * math.max(from.Y - ground.Y, 1) / 70), 0.45, 2.4)
+		task.delay(i * 0.012, function()
+			launch(entry.Code, from, function()
+				return ground
+			end, fall, 3, true, 1.4 + math.random())
+		end)
+	end
 end
 
 function ItemFx.init()
@@ -251,7 +298,11 @@ function ItemFx.init()
 	end)
 
 	StackRenderer.onItemsRemoved(function(player, removed)
-		if player ~= localPlayer or not nearBank() then
+		if not nearBank(player) then
+			tumble(removed)
+			return
+		end
+		if player ~= localPlayer then
 			return
 		end
 		local character = localPlayer.Character

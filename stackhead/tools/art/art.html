@@ -27,6 +27,7 @@
     background: rgba(28, 20, 48, 0.9); border: 6px solid #fff; -webkit-text-stroke: 4px #2a1540; paint-order: stroke fill; white-space: nowrap;
     box-shadow: 0 10px 20px rgba(0,0,0,0.35);
   }
+  .burst { position: absolute; transform: translate(-50%, -50%); width: 230px; height: 230px; }
   .tag { position: absolute; font-size: 54px; color: #fff; -webkit-text-stroke: 8px #2a1540; paint-order: stroke fill; filter: drop-shadow(0 6px 0 #2a1540); white-space: nowrap; }
 </style>
 </head>
@@ -237,7 +238,7 @@ function baseGroup(id) {
 }
 
 // Stack bent like the in-game renderer: lean spread along the height.
-function buildStack(anchor, codes, lean, baseId) {
+function buildStack(anchor, codes, lean, baseId, yawOffset = 0) {
   const items = codes.map(itemGroup);
   const total = items.reduce((s, i) => s + i.height, 0);
   const per = new THREE.Vector2(lean[0], lean[1]).divideScalar(Math.max(total, 12));
@@ -249,7 +250,7 @@ function buildStack(anchor, codes, lean, baseId) {
     cf.multiply(new THREE.Matrix4().makeTranslation(0, h, 0));
   };
   if (baseId) { const b = baseGroup(baseId); place(b.group, b.height, 0); }
-  items.forEach((it, i) => place(it.group, it.height, THREE.MathUtils.degToRad(((i + 1) * 137) % 60 - 30)));
+  items.forEach((it, i) => place(it.group, it.height, yawOffset + THREE.MathUtils.degToRad(((i + 1) * 137) % 60 - 30)));
   return new THREE.Vector3().setFromMatrixPosition(cf);
 }
 
@@ -273,15 +274,31 @@ function faceTexture(kind) {
   const g = c.getContext('2d');
   g.fillStyle = '#000'; g.globalAlpha = 1;
   const eye = (x) => {
+    if (kind === 'yikes') {
+      g.fillStyle = '#fff'; g.strokeStyle = '#1b1b24'; g.lineWidth = 7;
+      g.beginPath(); g.ellipse(x, 98, 27, 31, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.fillStyle = '#1b1b24'; g.beginPath(); g.ellipse(x + (x < 128 ? 6 : -6), 102, 9, 10, 0, 0, Math.PI * 2); g.fill();
+      return;
+    }
     g.fillStyle = '#1b1b24'; g.beginPath(); g.ellipse(x, 100, 16, kind === 'wow' ? 26 : 22, 0, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#fff'; g.beginPath(); g.ellipse(x + 5, 91, 6, 7, 0, 0, Math.PI * 2); g.fill();
   };
   eye(92); eye(164);
+  // Brows carry most of the expression at thumbnail size.
+  const brow = (x0, y0, x1, y1) => { g.strokeStyle = '#1b1b24'; g.lineWidth = 11; g.lineCap = 'round'; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); };
+  if (kind === 'yikes') { brow(62, 52, 112, 40); brow(144, 40, 194, 52); }
+  else if (kind === 'smirk') { brow(66, 62, 116, 76); brow(140, 70, 190, 58); }
+  else if (kind === 'wow') { brow(70, 58, 112, 50); brow(144, 50, 186, 58); }
   g.fillStyle = 'rgba(255,120,120,0.45)';
   g.beginPath(); g.ellipse(64, 142, 18, 10, 0, 0, Math.PI * 2); g.fill();
   g.beginPath(); g.ellipse(192, 142, 18, 10, 0, 0, Math.PI * 2); g.fill();
   g.strokeStyle = '#1b1b24'; g.lineWidth = 9; g.lineCap = 'round';
-  if (kind === 'wow') {
+  if (kind === 'yikes') {
+    g.fillStyle = '#3a1020'; g.beginPath(); g.roundRect(78, 146, 100, 52, 18); g.fill();
+    g.fillStyle = '#fff'; g.fillRect(88, 152, 80, 14); g.fillRect(88, 180, 80, 12);
+  } else if (kind === 'smirk') {
+    g.fillStyle = '#3a1020'; g.beginPath(); g.moveTo(84, 158); g.quadraticCurveTo(150, 200, 184, 138); g.quadraticCurveTo(140, 172, 84, 158); g.fill();
+  } else if (kind === 'wow') {
     g.fillStyle = '#3a1020'; g.beginPath(); g.ellipse(128, 168, 22, 28, 0, 0, Math.PI * 2); g.fill();
   } else if (kind === 'grin') {
     g.fillStyle = '#3a1020'; g.beginPath(); g.moveTo(80, 150); g.quadraticCurveTo(128, 222, 176, 150); g.closePath(); g.fill();
@@ -292,9 +309,9 @@ function faceTexture(kind) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
-function avatar({ pos, yaw = 0, skin = [255, 205, 60], shirt = [30, 110, 200], pants = [40, 130, 70], face = 'grin', pose = 'carry' }) {
+function avatar({ pos, yaw = 0, skin = [255, 205, 60], shirt = [30, 110, 200], pants = [40, 130, 70], face = 'grin', pose = 'carry', tilt = 0 }) {
   const root = new THREE.Group();
-  root.position.copy(pos); root.rotation.y = yaw;
+  root.position.copy(pos); root.rotation.set(0, yaw, tilt, 'YXZ');
   const box = (w, h, d, color, x, y, z, mat = 'SmoothPlastic') => {
     const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, 0.12), material(color, mat));
     m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; return m;
@@ -304,7 +321,7 @@ function avatar({ pos, yaw = 0, skin = [255, 205, 60], shirt = [30, 110, 200], p
   // Shirt stripe.
   root.add(box(2.02, 0.35, 1.02, lerpColor(shirt, [255, 255, 255], 0.7), 0, 3.3, 0));
   const legL = box(1, 2, 1, pants, -0.5, 1, 0), legR = box(1, 2, 1, pants, 0.5, 1, 0);
-  if (pose === 'run') { legL.rotation.x = 0.55; legL.position.z = -0.3; legR.rotation.x = -0.55; legR.position.z = 0.3; }
+  if (pose === 'run' || pose === 'shove') { legL.rotation.x = 0.55; legL.position.z = -0.3; legR.rotation.x = -0.55; legR.position.z = 0.3; }
   root.add(legL, legR);
   const arm = (side) => {
     const pivot = new THREE.Group(); pivot.position.set(side * 1.5, 3.9, 0);
@@ -312,6 +329,8 @@ function avatar({ pos, yaw = 0, skin = [255, 205, 60], shirt = [30, 110, 200], p
     if (pose === 'carry') { pivot.rotation.z = side * -2.6; pivot.rotation.x = 0.1; }
     else if (pose === 'run') { pivot.rotation.x = side * 0.9; }
     else if (pose === 'panic') { pivot.rotation.z = side * -2.3; pivot.rotation.x = -0.4; }
+    else if (pose === 'shove') { pivot.rotation.x = -1.45; pivot.rotation.z = side * 0.12; }
+    else if (pose === 'reach') { pivot.rotation.z = side * -2.75; pivot.rotation.x = side * 0.25; }
     return pivot;
   };
   root.add(arm(-1), arm(1));
@@ -358,7 +377,8 @@ function html(tag, cls, text, style) { const e = document.createElement(tag); e.
 function project(camera, v) { const p = v.clone().project(camera); return [(p.x + 1) / 2 * W, (1 - p.y) / 2 * H]; }
 
 // ---------------------------------------------------------------- post
-function render(camera, { focus, aperture = 0.00012, bloom = 0.35, dof = true, ao = true }) {
+function render(camera, { focus, aperture = 0.00012, bloom = 0.35, dof = true, ao = true, exposure = 1.08 }) {
+  renderer.toneMappingExposure = exposure;
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(world, camera));
   if (ao) {
@@ -392,58 +412,61 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const SHOTS = {
   tower() {
     const o = WORLD_X.Stackville;
-    setupLook('Stackville', V(o, 20, 60), 120);
+    setupLook('Stackville', V(o, 20, 66), 120);
     const hero = V(o + 1, 0.45, 70);
-    const camPos = hero.clone().add(V(9.5, 3.6, 15.5));
-    addWorld('Stackville', V(o, 0, 60), 420, [[camPos, hero.clone().add(V(0, 20, 0)), 6]]);
-    const top = avatar({ pos: hero, yaw: 0.55, face: 'grin' });
-    const codes = [...randomCodes([1, 2, 3, 4], 64, 5, 0.12)];
-    codes.splice(30, 0, 'pigg', 'carg'); codes.splice(22, 0, 'dkkg'); codes.splice(12, 0, 'chsg'); codes.splice(5, 0, 'dck');
-    const stackTop = buildStack(top, codes, [-1.6, 0.35], 'gold');
-    avatar({ pos: V(o - 14, 0.45, 52), yaw: 1.2, shirt: [200, 40, 40], pants: [30, 40, 60], skin: [234, 184, 146], face: 'smile' });
-    buildStack(V(o - 14, 5.75, 52), randomCodes([1, 2], 14, 9), [0.2, 0.05], 'pizza');
-    avatar({ pos: V(o + 20, 0.45, 44), yaw: -0.4, shirt: [110, 60, 170], pants: [60, 60, 70], skin: [160, 95, 53], face: 'smile' });
-    buildStack(V(o + 20, 5.75, 44), randomCodes([1], 9, 3), [0, 0.1], 'plate');
-    sparkles(top.clone().add(V(-4, 22, 0)), 26, 16);
-    const cam = cameraAt(camPos, hero.clone().add(V(-4, 13.5, -2)), 64);
-    render(cam, { focus: 18.5, aperture: 0.00018 });
-    html('div', 'logo', 'STACKHEAD', { left: '70px', top: '50px' });
-    html('div', 'logo-sub', 'STACK EVERYTHING!', { left: '96px', top: '225px' });
-    const [bx, by] = project(cam, top.clone().add(V(-2.5, 26, 0)));
-    html('div', 'bubble', '📦 ' + codes.length, { left: Math.min(W - 200, bx + 240) + 'px', top: Math.max(360, by) + 'px' });
-    html('div', 'sticker', 'HOW HIGH<br>CAN YOU GO?', { right: '70px', bottom: '70px', fontSize: '64px', textAlign: 'center' });
+    const camPos = hero.clone().add(V(2.3, 4.2, 9.2));
+    const look = hero.clone().add(V(-2.6, 8.4, 0));
+    addWorld('Stackville', V(o, 0, 60), 420, [[camPos, look, 5], [camPos, hero.clone().add(V(-6, 40, 0)), 8]]);
+    const top = avatar({ pos: hero, yaw: 0.22, face: 'grin' });
+    // Three absurd hero objects right above the head, where they read big.
+    const codes = ['car', 'pigg', 'dkk', 'bok', 'cpb', ...randomCodes([1, 2, 3, 4], 70, 5, 0.12)];
+    codes.splice(9, 0, 'tlt'); codes.splice(16, 0, 'chsg'); codes.splice(30, 0, 'carg');
+    // Staged: items turned to the camera (in game they face their owner's camera).
+    const stackTop = buildStack(top, codes, [2.3, -0.35], 'gold', Math.PI + 0.22);
+    // Friends in the background, for scale and "play together".
+    avatar({ pos: V(o - 12, 0.45, 56), yaw: 0.9, shirt: [200, 40, 40], pants: [30, 40, 60], skin: [234, 184, 146], face: 'smile' });
+    buildStack(V(o - 12, 5.75, 56), randomCodes([1, 2], 16, 9).filter((c) => !c.startsWith('lmp')), [0.6, 0.05], 'pizza', Math.PI);
+    avatar({ pos: V(o + 13, 0.45, 55), yaw: -0.5, shirt: [110, 60, 170], pants: [60, 60, 70], skin: [160, 95, 53], face: 'smile' });
+    buildStack(V(o + 13, 5.75, 55), randomCodes([1], 9, 3).filter((c) => !c.startsWith('lmp')), [0, 0.1], 'plate', Math.PI);
+    const cam = cameraAt(camPos, look, 66);
+    render(cam, { focus: 9.5, aperture: 0.00014, bloom: 0.18, exposure: 0.98 });
+    html('div', 'logo', 'STACKHEAD', { left: '60px', top: '50px', fontSize: '128px' });
+    html('div', 'bubble', '📦 ' + codes.length, { left: '300px', top: '330px', fontSize: '72px' });
   },
   crash() {
     const o = WORLD_X.Stackville;
-    setupLook('Stackville', V(o, 15, 60), 120);
-    const camPos = V(o + 7, 6, 86);
-    addWorld('Stackville', V(o, 0, 60), 420, [[camPos, V(o, 10, 66), 4]]);
-    const top = avatar({ pos: V(o, 0.45, 66), yaw: 0.3, face: 'wow', pose: 'panic' });
-    const codes = randomCodes([1, 2, 3, 4], 60, 21, 0.14);
-    const standing = codes.slice(0, 14);
-    const mid = buildStack(top, standing, [1.4, 0.3], 'cushion');
-    // The rest explodes outward and falls.
-    let seed = 7;
+    setupLook('Stackville', V(o, 15, 66), 90);
+    const camPos = V(o + 1.3, 5.3, 77.5), look = V(o + 0.9, 7.1, 66);
+    addWorld('Stackville', V(o, 0, 60), 420, [[camPos, look, 5], [camPos, V(o - 3, 16, 68), 5], [camPos, V(o - 9, 5, 67), 4]]);
+    // Victim: shoved from the right, tower snapping off to the left.
+    const victim = V(o - 0.6, 0.45, 66);
+    const top = avatar({ pos: victim, yaw: 0.35, face: 'yikes', pose: 'panic', tilt: 0.16 });
+    const mid = buildStack(top, ['crt', 'pmk', 'chs', 'bok', 'can'], [-1.6, 0.2], 'cushion');
+    // Bumper: mid-shove, grinning at the camera.
+    const bumper = V(o + 3.1, 0.45, 67.1);
+    avatar({ pos: bumper, yaw: -0.95, shirt: [225, 55, 70], pants: [35, 35, 50], skin: [234, 184, 146], face: 'smirk', pose: 'shove', tilt: -0.08 });
+    // The fall: hero objects near the lens, the rest of the tower behind.
+    const hero = (code, p, r) => { const it = itemGroup(code); it.group.position.copy(p); it.group.rotation.set(...r); world.add(it.group); };
+    hero('car', V(o - 5.6, 9.6, 67.2), [0.45, 0.9, 0.7]);
+    hero('dkk', V(o + 2.9, 9.7, 68.2), [-0.2, 0.35, 0.4]);
+    hero('pigg', V(o + 6.6, 9.6, 66.2), [0.3, -0.7, -0.5]);
+    hero('tvs', V(o + 9.6, 6.6, 64.8), [0.2, -0.9, 0.35]);
+    hero('mel', V(o - 7.4, 6.4, 67.4), [0.6, 0.3, 1.2]);
+    let seed = 11;
     const rnd = () => { seed = (seed * 48271) % 2147483647; return seed / 2147483647; };
-    codes.slice(14).forEach((code, i) => {
+    randomCodes([1, 2, 3, 4], 34, 21, 0.14).forEach((code, i) => {
       const it = itemGroup(code);
-      const t = i / 46;
-      const angle = rnd() * Math.PI * 2;
-      const out = 3 + t * 16 + rnd() * 5;
-      const p = mid.clone().add(V(Math.cos(angle) * out, 6 + t * 26 - out * 0.35 + rnd() * 6, Math.sin(angle) * out * 0.7));
-      it.group.position.copy(p);
+      const t = i / 34;
+      it.group.position.copy(mid.clone().add(V(-3 - t * 12 + rnd() * 10, 1 + t * 9 + rnd() * 3, -4 - rnd() * 8)));
       it.group.rotation.set(rnd() * 6, rnd() * 6, rnd() * 6);
       world.add(it.group);
     });
-    sparkles(mid.clone().add(V(0, 8, 0)), 40, 22, 0xffe070);
-    const bumper = V(o + 6, 0.45, 69);
-    avatar({ pos: bumper, yaw: -1.2, shirt: [220, 50, 50], pants: [30, 30, 40], skin: [234, 184, 146], face: 'grin', pose: 'run' });
-    speedLines(bumper, V(-1, 0, -0.35).normalize(), 12);
-    const cam = cameraAt(camPos, V(o + 1, 15.5, 63), 62);
-    render(cam, { focus: 21 });
-    html('div', 'logo', 'STACKHEAD', { left: '70px', top: '50px', fontSize: '130px' });
-    html('div', 'sticker', "DON'T DROP IT!", { right: '70px', bottom: '80px', fontSize: '80px' });
-    html('div', 'tag', '💥 BUMPED!', { left: project(cam, bumper.clone().add(V(0, 8, 0)))[0] - 120 + 'px', top: project(cam, bumper.clone().add(V(0, 8, 0)))[1] - 60 + 'px' });
+    const cam = cameraAt(camPos, look, 60);
+    render(cam, { focus: 11.5, aperture: 0.00016, bloom: 0.18, exposure: 0.98 });
+    const [ix, iy] = project(cam, V(o + 1.6, 3.7, 67));
+    html('div', 'burst', '<svg viewBox="-100 -100 200 200"><polygon points="0,-96 22,-38 78,-62 44,-12 96,14 38,28 56,86 8,42 -30,92 -34,34 -92,40 -48,2 -88,-44 -30,-30 -34,-86" fill="#ffe14a" stroke="#2a1540" stroke-width="10" stroke-linejoin="round"/><polygon points="0,-50 12,-20 42,-32 24,-6 52,8 20,16 30,46 4,22 -16,48 -18,18 -48,20 -24,0 -46,-24 -16,-16 -18,-46" fill="#fff"/></svg>', { left: ix + 'px', top: iy + 'px' });
+    html('div', 'logo', 'STACKHEAD', { left: '60px', top: '40px', fontSize: '112px' });
+    html('div', 'sticker', "DON'T DROP IT!", { right: '60px', top: '60px', fontSize: '64px' });
   },
   panel() {
     const name = params.get('world');
@@ -490,17 +513,26 @@ const SHOTS = {
   },
   icon() {
     const o = WORLD_X.Stackville;
-    setupLook('Stackville', V(o, 20, 60), 80);
+    setupLook('Stackville', V(o, 20, 60), 40);
+    // Simple, high-contrast background: blue sunburst behind the head.
+    const c = document.createElement('canvas'); c.width = 1024; c.height = 1024;
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(512, 700, 60, 512, 700, 900);
+    grad.addColorStop(0, '#8fd4ff'); grad.addColorStop(1, '#1f6fd6');
+    g.fillStyle = grad; g.fillRect(0, 0, 1024, 1024);
+    g.fillStyle = 'rgba(255,255,255,0.13)';
+    for (let i = 0; i < 18; i++) {
+      const a0 = (i / 18) * Math.PI * 2, a1 = a0 + Math.PI / 18;
+      g.beginPath(); g.moveTo(512, 700); g.lineTo(512 + Math.cos(a0) * 1600, 700 + Math.sin(a0) * 1600); g.lineTo(512 + Math.cos(a1) * 1600, 700 + Math.sin(a1) * 1600); g.closePath(); g.fill();
+    }
+    const bg = new THREE.CanvasTexture(c); bg.colorSpace = THREE.SRGBColorSpace;
+    world.background = bg; world.fog = null;
     const hero = V(o, 0.45, 70);
-    const camPos = hero.clone().add(V(4.6, 5.4, 9.4));
-    addWorld('Stackville', V(o, 0, 60), 300, [[camPos, hero.clone().add(V(0, 5, 0)), 3]]);
-    const top = avatar({ pos: hero, yaw: 0.45, face: 'grin' });
-    const codes = randomCodes([1, 2, 3, 4], 30, 12, 0.18);
-    codes.splice(6, 0, 'pigg');
-    codes.splice(3, 0, 'carg');
-    buildStack(top, codes, [-1.1, 0.2], 'gold');
-    const cam = cameraAt(camPos, hero.clone().add(V(-1.6, 8.6, 0)), 66);
-    render(cam, { focus: 10, aperture: 0.00035 });
+    const top = avatar({ pos: hero, yaw: 0.12, face: 'grin', pose: 'carry', skin: [234, 184, 146], shirt: [235, 60, 90] });
+    const codes = ['dkk', 'car', 'pigg', 'cpb', 'chsg', 'tlt', ...randomCodes([1, 2, 3, 4], 18, 12, 0.18)];
+    buildStack(top, codes, [1.9, -0.2], 'gold', Math.PI + 0.12);
+    const cam = cameraAt(hero.clone().add(V(0.8, 5.0, 7.1)), hero.clone().add(V(0.4, 6.8, 0)), 56);
+    render(cam, { dof: false, bloom: 0.12, exposure: 1.0 });
   },
 };
 

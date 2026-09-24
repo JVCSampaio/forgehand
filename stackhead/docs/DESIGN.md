@@ -197,6 +197,14 @@ Roblox. Um teste garante 1 meme por tier, valor acima da média e raridade.
 Todos os 84 itens são revisados visualmente numa galeria renderizada dos
 modelos reais (`SHOTS=gallery tools/art/run.sh` → `build/art/out/gallery-*.png`).
 
+## 6d. Variedade cedo: visitar mundos bloqueados
+
+Os mundos novos demoram (Frostpeak ~2 h para um humano). Para mostrar a
+variedade já na primeira sessão, qualquer mundo pode ser **visitado** pelo botão
+👀 VISIT no painel WORLDS. Lá nada pode ser levantado até ter o Strength do mundo
+(o servidor já filtra por tier), então visitar não pula progressão: é vitrine e
+motivação. Na compra de Strength 3 aparece a dica *"peek at the other worlds"*.
+
 ## 9. MVP (o que está construído)
 
 - 1 mapa circular gerado por código: banco no centro + 4 anéis (Market, Yard Sale, Old Farm, Docks)
@@ -247,15 +255,20 @@ vidro brilhante, golden = folha dourada + partículas). Nada de realismo.
 ## 14. Thumbnail / ícone
 
 Arte pronta em [`../marketing/`](../marketing/), renderizada a partir do mapa e dos
-itens reais (`tools/art/run.sh`): `thumbnail-tower.png` (a fantasia),
-`thumbnail-crash.png` (o risco), `thumbnail-worlds.png` (o conteúdo) e `icon-512.png`.
-Use as três thumbnails em rotação/A-B.
+itens reais (`tools/art/run.sh`). As cenas são encenadas (poses, rostos e itens
+virados para a câmera), mas usam os modelos e o mapa do jogo.
 
-
-- **Ícone:** close do avatar olhando pra cima, com uma torre de itens coloridos saindo do quadro; um porco dourado no meio.
-- **Thumbnail 1:** avatar pequeno no chão ↔ torre enorme (seta "1 → 200"), pilha curvada, moedas explodindo.
-- **Thumbnail 2 (A/B):** a torre desabando sobre outros jogadores, "💥 CRASH!".
-- Texto máximo de 2 palavras: **"STACK IT"**, **"DON'T DROP IT"**.
+- **Símbolo recorrente: o King Duck** (pato de borracha coroado). Aparece no ícone,
+  nas duas thumbnails e é o item mais raro do jogo.
+- **`thumbnail-crash.png` (principal):** a história em um quadro: um jogador
+  empurra, o outro faz cara de pânico, a torre explode com carro, porco dourado,
+  King Duck e TV caindo perto da câmera. Estrela de impacto no ponto de contato.
+- **`thumbnail-tower.png` (A/B):** avatar de perto, três objetos absurdos logo
+  acima da cabeça (carro, porco dourado, King Duck), torre sumindo no céu, contador.
+- **`thumbnail-worlds.png` (secundária):** variedade dos 4 mundos.
+- **`icon-512.png`:** rosto grande, King Duck na cabeça, torre inclinada, fundo
+  simples de raios azuis (lê bem em 64 px).
+- No máximo dois blocos de texto por imagem; nada de texto em cima dos rostos.
 
 ## 15. Nome e descoberta
 

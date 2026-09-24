@@ -508,7 +508,10 @@ function Menus.openWorlds(quiet: boolean?)
 			table.insert(items, zone.DisplayName)
 		end
 		UIKit.label({
-			Text = world.Tagline .. " · " .. table.concat(items, ", "),
+			Text = (if unlocked then "" else string.format("🔒 Lift items at 💪%d · ", world.FirstTier))
+				.. world.Tagline
+				.. " · "
+				.. table.concat(items, ", "),
 			Position = UDim2.fromOffset(0, 38),
 			Size = UDim2.new(0.62, 0, 0, 32),
 			TextXAlignment = Enum.TextXAlignment.Left,
@@ -520,24 +523,19 @@ function Menus.openWorlds(quiet: boolean?)
 		})
 		local here = data.World == world.Id
 		local button = UIKit.button({
-			Text = if here then "YOU'RE HERE" elseif unlocked then "TRAVEL" else string.format("🔒 💪%d", world.FirstTier),
+			Text = if here then "YOU'RE HERE" elseif unlocked then "TRAVEL" else "👀 VISIT",
 			AnchorPoint = Vector2.new(1, 0.5),
 			Position = UDim2.new(1, 0, 0.5, 0),
 			Size = UDim2.new(0.34, 0, 0, 58),
-			BackgroundColor3 = if here then C.Disabled elseif unlocked then C.Green else C.Disabled,
+			BackgroundColor3 = if here then C.Disabled elseif unlocked then C.Green else C.Blue,
 			ZIndex = 12,
 			Parent = frame,
 		})
-		if unlocked and not here then
+		if not here then
 			button.Activated:Connect(function()
 				Audio.play("Click")
 				Remotes.Travel:FireServer(world.Id)
 				closePanel()
-			end)
-		elseif not unlocked then
-			button.Activated:Connect(function()
-				Audio.play("Error")
-				HUD.toast(string.format("Reach Strength %d to unlock %s!", world.FirstTier, world.DisplayName), "Error")
 			end)
 		end
 	end
