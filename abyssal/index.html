@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Abyssal Dungeon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<style>
+  /* Single dark look by design: a lantern-lit diorama. Every color is explicit. */
+  :root {
+    color-scheme: dark;
+    --ink: #0b0a09;
+    --panel: rgba(17, 14, 12, 0.84);
+    --panel-edge: rgba(242, 179, 90, 0.16);
+    --bone: #e6dcc6;
+    --dim: #8f8574;
+    --lantern: #f2b35a;
+    --blood: #b3261e;
+    --bad: #c8412f;
+    --warn: #d9a13b;
+    --ok: #7fa35a;
+    --ok-dim: #52663e;
+    --magic: #a98bff;
+    --sound: #b7a6de;
+    --display: 'IM Fell English SC', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+    --ui: 'Barlow Semi Condensed', 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--ink); color: var(--bone); font: 14px/1.35 var(--ui);
+    overflow: hidden; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums;
+  }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
+  #vignette { position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.55) 100%); }
+  body.menu .hud, body.menu #autoslow, body.menu #player-intent { display: none; }
+  kbd { font: 600 11px var(--ui); color: var(--lantern); border: 1px solid rgba(242,179,90,0.35); border-radius: 3px; padding: 0 4px; margin-right: 4px; background: rgba(0,0,0,0.35); }
+  .muted { color: var(--dim); }
+  .small { font-size: 12px; }
+  button { font: 600 13px var(--ui); color: var(--bone); background: rgba(255,255,255,0.05); border: 1px solid rgba(230,220,198,0.18); border-radius: 3px; padding: 3px 8px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--lantern); color: var(--lantern); }
+  button:disabled { opacity: 0.35; cursor: default; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--lantern); outline-offset: 1px; }
+
+  /* ---- HUD ---- */
+  .hud { position: fixed; pointer-events: none; }
+  .hud > * { pointer-events: auto; }
+  .plate { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 4px; backdrop-filter: blur(3px); }
+  #top { top: calc(10px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; }
+  #top .plate { padding: 5px 12px; display: flex; gap: 12px; align-items: baseline; white-space: nowrap; }
+  #who { font: 18px var(--display); color: var(--bone); }
+  #where, #clock { color: var(--dim); font-weight: 500; }
+  .mode { white-space: nowrap; font: 700 12px var(--ui); letter-spacing: 0.12em; padding: 6px 10px; border-radius: 3px; background: rgba(0,0,0,0.6); border: 1px solid rgba(230,220,198,0.2); min-width: 64px; text-align: center; }
+  .mode.slow { color: var(--lantern); border-color: var(--lantern); }
+  .mode.paused { color: #111; background: var(--lantern); border-color: var(--lantern); animation: pulse 1.4s ease-in-out infinite; }
+  .mode.rest { color: var(--sound); border-color: var(--sound); }
+  #pause-btn { padding: 5px 9px; }
+  #safe { font: 700 11px var(--ui); letter-spacing: 0.12em; color: var(--ok); border: 1px solid var(--ok); padding: 5px 8px; border-radius: 3px; background: rgba(0,0,0,0.6); }
+  #autoslow { position: fixed; top: calc(46px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); color: var(--dim); font-size: 11px; pointer-events: none; }
+  @keyframes pulse { 50% { opacity: 0.7; } }
+
+  #left { top: calc(10px + env(safe-area-inset-top, 0px)); left: 10px; width: 250px; padding: 10px; display: grid; gap: 8px; max-height: calc(100% - 200px); overflow: auto; }
+  #left h2 { margin: 0; font: 13px var(--display); letter-spacing: 0.08em; color: var(--lantern); }
+  .body-row { display: grid; grid-template-columns: 74px 1fr; gap: 10px; align-items: start; }
+  #figure svg { width: 74px; height: auto; display: block; }
+  #figure rect { stroke: rgba(0,0,0,0.6); stroke-width: 1; transition: fill 0.2s; }
+  #figure rect.bleeding { stroke: #ff3a2a; stroke-width: 2; animation: bleed 0.9s ease-in-out infinite; }
+  #figure rect.fracture { stroke-dasharray: 3 2; stroke: var(--bone); stroke-width: 1.5; }
+  @keyframes bleed { 50% { stroke-opacity: 0.25; } }
+  #wounds { display: grid; gap: 5px; font-size: 12px; max-height: 150px; overflow: auto; }
+  .wound { display: grid; gap: 1px; border-left: 2px solid rgba(230,220,198,0.2); padding-left: 6px; }
+  .wound b { font-size: 11px; letter-spacing: 0.08em; color: var(--bone); }
+  .wound span { color: var(--dim); }
+  .wound.bad { border-left-color: var(--bad); }
+  .wound.bad span { color: #e2a095; }
+  #bars { display: grid; gap: 4px; }
+  .bar { position: relative; display: flex; justify-content: space-between; font-size: 12px; padding: 2px 6px 4px; background: rgba(255,255,255,0.03); border-radius: 2px; overflow: hidden; }
+  .bar i { position: absolute; left: 0; bottom: 0; height: 2px; }
+  .bn { letter-spacing: 0.06em; text-transform: uppercase; font-size: 11px; color: var(--dim); }
+  .bt { font-weight: 600; }
+  #moodles { display: flex; flex-wrap: wrap; gap: 4px; }
+  .moodle { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; padding: 1px 6px; border-radius: 10px; border: 1px solid; }
+  .moodle.bad { color: #f0a090; border-color: var(--bad); background: rgba(200,65,47,0.15); }
+  .moodle.warn { color: var(--warn); border-color: rgba(217,161,59,0.5); }
+  .moodle.ok { color: #b6cf98; border-color: rgba(127,163,90,0.5); }
+
+  #right { top: calc(10px + env(safe-area-inset-top, 0px)); right: 10px; width: 220px; padding: 10px; display: grid; gap: 8px; }
+  #minimap { width: 100%; image-rendering: pixelated; background: rgba(0,0,0,0.5); border-radius: 2px; }
+  .gear { font-size: 12px; color: var(--dim); }
+  .gear b { color: var(--bone); font-size: 13px; display: block; }
+  .cond { display: block; height: 3px; background: rgba(255,255,255,0.08); margin-top: 3px; }
+  .cond i { display: block; height: 3px; }
+  .spells { display: grid; gap: 3px; margin-top: 4px; }
+  .spell { font-size: 12px; color: var(--magic); }
+  .spell span { color: var(--dim); display: block; padding-left: 22px; }
+  .spell.dim { opacity: 0.5; }
+
+  #log { left: 10px; bottom: calc(var(--hb, 44px) + 22px + env(safe-area-inset-bottom, 0px)); width: min(520px, calc(100% - 260px)); pointer-events: none; display: grid; gap: 1px; text-shadow: 0 1px 2px #000, 0 0 6px #000; }
+  .msg { font-size: 13px; }
+  .msg.danger { color: #f08070; }
+  .msg.warn { color: var(--warn); }
+  .msg.good { color: #c9dcae; }
+  .msg.magic { color: var(--magic); }
+  .msg.sound { color: var(--sound); font-style: italic; }
+
+  #hotbar { left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 6px; max-width: calc(100% - 20px); }
+  .hb { padding: 5px 8px; font-size: 12px; background: rgba(0,0,0,0.35); }
+  .hb.magic { color: var(--magic); border-color: rgba(169,139,255,0.35); }
+  .hb.gun { color: var(--warn); }
+  .hb.stairs { color: var(--lantern); border-color: var(--lantern); }
+
+  #player-intent { position: fixed; left: 50%; bottom: calc(var(--hb, 44px) + 24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); text-align: center; pointer-events: none; text-shadow: 0 1px 3px #000; }
+  .pi-label { font-weight: 600; color: var(--lantern); }
+  .pi-bar { display: block; width: 160px; height: 3px; margin: 3px auto 0; background: rgba(255,255,255,0.12); }
+  .pi-bar i { display: block; height: 3px; background: var(--lantern); }
+  .pi-queued { font-size: 12px; color: var(--magic); }
+
+  #labels, #floaters { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .intent { position: absolute; left: 0; top: 0; display: grid; justify-items: center; gap: 1px; font-size: 11px; white-space: nowrap; text-shadow: 0 1px 2px #000, 0 0 4px #000; }
+  .intent b { font-size: 12px; color: #f0c0b0; }
+  .intent span { color: var(--bone); }
+  .intent.ally b { color: #b6ff9a; }
+  .intent.tele span { color: var(--lantern); font-weight: 700; }
+  .intent .hp, .intent .tb { display: block; width: 44px; height: 3px; background: rgba(0,0,0,0.6); }
+  .intent .hp i { display: block; height: 3px; background: var(--bad); }
+  .intent .tb i { display: block; height: 3px; background: var(--lantern); }
+  .intent .zz { color: var(--sound); font-style: italic; letter-spacing: 0.2em; }
+  .floater { position: absolute; left: 0; top: 0; font: 700 14px var(--ui); text-shadow: 0 1px 2px #000; }
+  .floater.dmg { color: var(--bone); }
+  .floater.crit { color: var(--lantern); font-size: 17px; }
+  .floater.hurt { color: #ff6a5a; }
+  .floater.miss { color: var(--dim); font-weight: 500; }
+
+  /* ---- modal ---- */
+  #modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.45); padding-inline: 16px; }
+  #modal .sheet { position: relative; width: min(1100px, 100%); max-height: 84%; overflow: auto; padding: 16px 18px; }
+  #modal-close { position: absolute; top: 10px; right: 10px; }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+  .cols .wide2 { grid-column: span 2; }
+  .cols h3 { font: 17px var(--display); color: var(--lantern); margin: 4px 0 8px; letter-spacing: 0.04em; }
+  .cols h4 { margin: 10px 0 4px; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+  .cols p { margin: 4px 0 8px; max-width: 65ch; }
+  .row { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid rgba(230,220,198,0.06); flex-wrap: wrap; }
+  .row .nm { flex: 1 1 120px; }
+  .row .slot { width: 110px; color: var(--dim); font-size: 12px; }
+  .row .wt { color: var(--dim); font-size: 12px; }
+  .row.dim { opacity: 0.55; }
+  .row button { padding: 2px 6px; font-size: 12px; }
+  button.wide { width: 100%; margin: 6px 0; }
+  .skills { columns: 2 220px; }
+  .skill { break-inside: avoid; cursor: pointer; }
+  .skill .lv { width: 34px; text-align: right; font-weight: 700; }
+  .skill .apt { width: 22px; color: var(--ok); font-size: 11px; }
+  .skill:not(.on) .nm, .skill:not(.on) .lv { color: var(--dim); }
+  .help p { font-size: 13px; }
+
+  /* ---- screens ---- */
+  .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding-inline: 16px; background: radial-gradient(ellipse at 50% 30%, rgba(60,40,20,0.55), rgba(5,5,6,0.96) 70%); overflow: auto; }
+  .start-wrap { width: min(1080px, 100%); padding-block: 24px; }
+  .title { font: clamp(40px, 7vw, 76px)/0.95 var(--display); color: var(--bone); margin: 0; letter-spacing: 0.02em; text-wrap: balance; }
+  .title small { display: block; font-size: 0.32em; color: var(--lantern); letter-spacing: 0.16em; margin-top: 10px; }
+  .pitch { color: var(--dim); max-width: 62ch; margin: 12px 0 20px; font-size: 15px; }
+  .start-body { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 24px; }
+  .start-body h3 { font: 18px var(--display); color: var(--lantern); margin: 14px 0 8px; }
+  .name { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+  .name input { flex: 1; font: 20px var(--display); color: var(--bone); background: rgba(0,0,0,0.4); border: 1px solid rgba(230,220,198,0.25); padding: 5px 10px; border-radius: 3px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+  .card { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid rgba(230,220,198,0.15); border-radius: 4px; background: rgba(0,0,0,0.35); cursor: pointer; }
+  .card input { position: absolute; opacity: 0; pointer-events: none; }
+  .card b { font: 17px var(--display); }
+  .card span { color: var(--dim); font-size: 13px; }
+  .card:has(input:checked) { border-color: var(--lantern); background: rgba(242,179,90,0.08); }
+  .card:has(input:focus-visible) { outline: 2px solid var(--lantern); }
+  .go { margin-top: 18px; font: 20px var(--display); padding: 10px 22px; color: #140e08; background: var(--lantern); border-color: var(--lantern); }
+  .go:hover:not(:disabled) { color: #140e08; filter: brightness(1.1); }
+  aside { border-left: 1px solid rgba(230,220,198,0.12); padding-left: 18px; }
+  .epitaph-mini { font-size: 13px; margin-bottom: 10px; }
+  .epitaph-mini span { color: var(--dim); }
+  .hollow { color: #9fe6d8; font-style: italic; }
+  .controls-hint { color: var(--dim); font-size: 13px; margin-top: 14px; }
+  .epitaph { width: min(520px, 100%); text-align: center; padding: 28px 24px; border: 1px solid rgba(230,220,198,0.2); background: rgba(10,8,7,0.85); }
+  .epitaph .day { font: 15px var(--display); letter-spacing: 0.3em; color: var(--blood); }
+  .epitaph h2 { font: 36px var(--display); margin: 8px 0 4px; text-wrap: balance; }
+  .epitaph dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; text-align: left; margin: 18px 0; }
+  .epitaph dt { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; padding-top: 2px; }
+  .epitaph dd { margin: 0; }
+
+  @media (max-width: 900px) {
+    #left { width: 190px; }
+    #right { width: 150px; }
+    #who { font-size: 15px; }
+    #where { display: none; }
+    .start-body { grid-template-columns: 1fr; }
+    aside { border-left: 0; padding-left: 0; }
+    .cols .wide2 { grid-column: auto; }
+  }
+  @media (max-width: 560px) {
+    #left { width: 150px; padding: 6px; }
+    #left .body-row { grid-template-columns: 1fr; }
+    #wounds, #moodles { display: none; }
+    #right { display: none; }
+    #clock { display: none; }
+    #log { width: calc(100% - 20px); }
+    .hb { padding: 4px 6px; font-size: 11px; }
+  }
+  @media (max-width: 1250px) {
+    #log { width: min(420px, calc(100% - 260px)); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mode.paused, #figure rect.bleeding { animation: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Masmorra em visão isométrica"></canvas>
+<div id="vignette"></div>
+
+<div id="top" class="hud">
+  <div class="plate"><span id="who"></span><span id="where"></span><span id="clock"></span></div>
+  <div id="mode" class="mode">1×</div>
+  <button id="pause-btn" type="button" title="Pausa tática (Espaço)">❚❚</button>
+  <div id="safe" style="display:none">SALA SEGURA</div>
+</div>
+<div id="autoslow"></div>
+
+<div id="left" class="hud plate">
+  <h2>Condição</h2>
+  <div class="body-row"><div id="figure"></div><div id="wounds"></div></div>
+  <div id="moodles"></div>
+  <div id="bars"></div>
+</div>
+
+<div id="right" class="hud plate">
+  <canvas id="minimap" width="162" height="162" aria-label="Mapa"></canvas>
+  <div id="gear"></div>
+</div>
+
+<div id="log" class="hud"></div>
+<div id="player-intent"></div>
+<div id="hotbar" class="hud plate"></div>
+<div id="labels"></div>
+<div id="floaters"></div>
+
+<div id="modal" role="dialog" aria-modal="true">
+  <div class="sheet plate">
+    <button id="modal-close" type="button">Fechar [Esc]</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<div id="screen-start" class="screen">
+  <div class="start-wrap">
+    <h1 class="title">Abyssal Dungeon<small>Masmorra Abissal · Fortaleza Esquecida · demo</small></h1>
+    <p class="pitch">Sobreviva a uma megamasmorra de fantasia onde cada ferida importa, cada feitiço tem consequência e cada personagem morto continua em algum lugar lá embaixo. Fome, sede, ferimentos localizados, barulho, luz, fogo e permadeath — em tempo contínuo com pausa tática.</p>
+    <div class="start-body"></div>
+    <p class="controls-hint"><kbd>WASD</kbd> mover · clique para andar/atacar · <kbd>Espaço</kbd> pausa tática · <kbd>1</kbd>–<kbd>4</kbd> magia · <kbd>B</kbd> tratar ferimentos · <kbd>H</kbd> todos os controles</p>
+  </div>
+</div>
+
+<div id="screen-death" class="screen"><div class="epitaph"></div></div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

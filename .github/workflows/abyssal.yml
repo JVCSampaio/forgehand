@@ -1,0 +1,23 @@
+name: Abyssal Dungeon
+
+on:
+  push:
+    paths: ["abyssal/**", ".github/workflows/abyssal.yml"]
+  pull_request:
+    paths: ["abyssal/**", ".github/workflows/abyssal.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulation:
+    name: Simulation tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test
+        working-directory: abyssal
+        run: |
+          node --version
+          node --test tests/*.test.mjs
