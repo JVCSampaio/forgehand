@@ -1,0 +1,270 @@
+-- Client-only juice: items flying onto the stack, loose items falling from
+-- collapsed stacks and item rain, stacks pouring into the bank, camera shake.
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local Shared = game:GetService("ReplicatedStorage").Shared
+local GameConfig = require(Shared.Config.GameConfig)
+local ItemBuilder = require(Shared.ItemBuilder)
+local StackCodec = require(Shared.StackCodec)
+local Remotes = require(Shared.Remotes)
+local Audio = require(script.Parent.Audio)
+local StackRenderer = require(script.Parent.StackRenderer)
+local ClientState = require(script.Parent.ClientState)
+
+local ItemFx = {}
+
+local localPlayer = Players.LocalPlayer
+
+type Flight = {
+	Parts: { BasePart },
+	Offsets: { CFrame },
+	From: Vector3,
+	To: () -> Vector3,
+	Start: number,
+	Duration: number,
+	Arc: number,
+	Spin: number,
+	DestroyAtEnd: boolean,
+	Model: Model,
+	Final: { CFrame }?,
+}
+
+local flights: { Flight } = {}
+local fxFolder: Folder
+local shakeUntil = 0
+local shakeStrength = 0
+local MAX_FLIGHTS = 80
+
+local function partsOf(model: Model): ({ BasePart }, { CFrame })
+	local parts, offsets = {}, {}
+	for _, child in model:GetDescendants() do
+		if child:IsA("BasePart") then
+			child.CanQuery = false
+			table.insert(parts, child)
+			table.insert(offsets, child:GetAttribute("Offset") or CFrame.identity)
+		end
+	end
+	return parts, offsets
+end
+
+local function launch(code: string, from: Vector3, to: () -> Vector3, duration: number, arc: number)
+	if #flights >= MAX_FLIGHTS then
+		return
+	end
+	local model = ItemBuilder.build(code)
+	if not model then
+		return
+	end
+	local parts, offsets = partsOf(model)
+	model.Parent = fxFolder
+	table.insert(flights, {
+		Parts = parts,
+		Offsets = offsets,
+		From = from,
+		To = to,
+		Start = os.clock(),
+		Duration = duration,
+		Arc = arc,
+		Spin = math.random() * 8 - 4,
+		DestroyAtEnd = true,
+		Model = model,
+	})
+end
+
+function ItemFx.shake(strength: number, duration: number)
+	shakeStrength = math.max(shakeStrength, strength)
+	shakeUntil = math.max(shakeUntil, os.clock() + duration)
+end
+
+-- Items dropped by the server with DropFrom/DropAt fall locally before landing.
+local function animateDrop(model: Model)
+	local dropAt = model:GetAttribute("DropAt")
+	local from = model:GetAttribute("DropFrom")
+	if typeof(dropAt) ~= "number" or typeof(from) ~= "Vector3" then
+		return
+	end
+	local remaining = dropAt - Workspace:GetServerTimeNow()
+	if remaining <= 0.05 or #flights >= MAX_FLIGHTS then
+		return
+	end
+	local parts, offsets = partsOf(model)
+	local root = model.PrimaryPart
+	if not root then
+		return
+	end
+	local finalCenter = root.CFrame * (root:GetAttribute("Offset") or CFrame.identity):Inverse()
+	local finals = {}
+	for i, part in parts do
+		finals[i] = part.CFrame
+	end
+	local target = finalCenter.Position
+	table.insert(flights, {
+		Parts = parts,
+		Offsets = offsets,
+		From = from,
+		To = function()
+			return target
+		end,
+		Start = os.clock(),
+		Duration = remaining,
+		Arc = if (from - target).Magnitude > 60 then 0 else 6,
+		Spin = math.random() * 10 - 5,
+		DestroyAtEnd = false,
+		Model = model,
+		Final = finals,
+	})
+end
+
+local function updateFlights()
+	if #flights == 0 then
+		return
+	end
+	local now = os.clock()
+	local parts, cframes = {}, {}
+	for index = #flights, 1, -1 do
+		local flight = flights[index]
+		local t = math.clamp((now - flight.Start) / flight.Duration, 0, 1)
+		if t >= 1 or not flight.Model.Parent then
+			table.remove(flights, index)
+			if flight.DestroyAtEnd then
+				flight.Model:Destroy()
+			elseif flight.Final and flight.Model.Parent then
+				for i, part in flight.Parts do
+					table.insert(parts, part)
+					table.insert(cframes, flight.Final[i])
+				end
+			end
+		else
+			local target = flight.To()
+			local eased = if flight.DestroyAtEnd then 1 - (1 - t) ^ 2 else t * t
+			local position = flight.From:Lerp(target, eased) + Vector3.new(0, math.sin(t * math.pi) * flight.Arc, 0)
+			local center = CFrame.new(position) * CFrame.Angles(t * flight.Spin, t * flight.Spin * 0.7, 0)
+			for i, part in flight.Parts do
+				table.insert(parts, part)
+				table.insert(cframes, center * flight.Offsets[i])
+			end
+		end
+	end
+	if #parts > 0 then
+		Workspace:BulkMoveTo(parts, cframes, Enum.BulkMoveMode.FireCFrameChanged)
+	end
+end
+
+local function updateShake()
+	local camera = Workspace.CurrentCamera
+	local now = os.clock()
+	if not camera or now > shakeUntil then
+		shakeStrength = 0
+		return
+	end
+	local fade = (shakeUntil - now)
+	local s = shakeStrength * math.min(fade * 3, 1)
+	camera.CFrame *= CFrame.Angles(math.rad(math.sin(now * 55) * s), math.rad(math.cos(now * 47) * s), 0)
+end
+
+local function spinBankCoin()
+	local map = Workspace:WaitForChild("Map", 30)
+	local coin = map and map:WaitForChild("BankCoin", 30) :: BasePart?
+	if not coin then
+		return
+	end
+	local base = coin.CFrame
+	RunService.RenderStepped:Connect(function()
+		local t = os.clock()
+		coin.CFrame = CFrame.new(base.Position + Vector3.new(0, math.sin(t * 1.5) * 0.8, 0)) * CFrame.Angles(0, t * 1.2, 0) * CFrame.Angles(0, 0, math.rad(90))
+	end)
+end
+
+local function stackTop(): Vector3
+	local top = StackRenderer.topOf(localPlayer)
+	if top then
+		return top.Position
+	end
+	local character = localPlayer.Character
+	local head = character and character:FindFirstChild("Head") :: BasePart?
+	return if head then head.Position + Vector3.new(0, 1, 0) else Vector3.zero
+end
+
+local function nearBank(): boolean
+	local character = localPlayer.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return false
+	end
+	local offset = root.Position - GameConfig.Bank.Position
+	return Vector2.new(offset.X, offset.Z).Magnitude < GameConfig.Bank.Radius + 6
+end
+
+function ItemFx.init()
+	fxFolder = Instance.new("Folder")
+	fxFolder.Name = "ClientFx"
+	fxFolder.Parent = Workspace
+
+	RunService:BindToRenderStep("ItemFlights", Enum.RenderPriority.Character.Value + 2, updateFlights)
+	RunService:BindToRenderStep("CameraShake", Enum.RenderPriority.Camera.Value + 1, updateShake)
+	task.spawn(spinBankCoin)
+
+	local itemsFolder = Workspace:WaitForChild("Items")
+	itemsFolder.ChildAdded:Connect(function(child)
+		if child:IsA("Model") then
+			animateDrop(child)
+		end
+	end)
+
+	Remotes.PickedUp.OnClientEvent:Connect(function(list)
+		if typeof(list) ~= "table" then
+			return
+		end
+		local count = #ClientState.stackCodes()
+		for i, entry in list do
+			local code, from = entry[1], entry[2]
+			if typeof(code) == "string" and typeof(from) == "Vector3" then
+				launch(code, from, stackTop, 0.28, 2)
+				local _, rarity = StackCodec.parse(code)
+				if rarity ~= "" then
+					Audio.play("Rare")
+				end
+				-- Rising pitch as the stack grows: the core "one more" sound.
+				local pitch = 0.8 + math.min(count - #list + i, 60) * 0.015
+				Audio.play("Pickup", pitch)
+			end
+		end
+	end)
+
+	StackRenderer.onItemsRemoved(function(player, removed)
+		if player ~= localPlayer or not nearBank() then
+			return
+		end
+		local bankTarget = GameConfig.Bank.Position + Vector3.new(0, 16, 0)
+		for i, entry in removed do
+			if i > 40 then
+				break
+			end
+			task.delay(i * 0.02, function()
+				launch(entry.Code, entry.CFrame.Position, function()
+					return bankTarget
+				end, 0.45, 4)
+			end)
+		end
+	end)
+
+	Remotes.Collapsed.OnClientEvent:Connect(function(userId, lost, origin)
+		if typeof(origin) ~= "Vector3" then
+			return
+		end
+		Audio.play("Collapse", 1, origin)
+		if userId == localPlayer.UserId then
+			ItemFx.shake(math.clamp((lost or 1) * 0.06, 0.6, 2.5), 0.6)
+		end
+	end)
+
+	Remotes.Bumped.OnClientEvent:Connect(function(_otherUserId, isVictim)
+		Audio.play("Bump")
+		ItemFx.shake(if isVictim then 1.4 else 0.6, 0.3)
+	end)
+end
+
+return ItemFx

@@ -1,0 +1,35 @@
+name: Stackhead
+
+on:
+  push:
+    paths: ["stackhead/**", ".github/workflows/stackhead.yml"]
+  pull_request:
+    paths: ["stackhead/**", ".github/workflows/stackhead.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Tests, sim and place build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Rojo, Lune and StyLua
+        run: cargo install --locked rojo@7.7.0 lune@0.10.5 stylua@2.5.2
+      - name: Format
+        working-directory: stackhead
+        run: stylua --check src tests tools
+      - name: Unit tests
+        working-directory: stackhead
+        run: lune run tests/runner.luau
+      - name: Economy simulation
+        working-directory: stackhead
+        run: lune run tools/economy_sim.luau
+      - name: Build place
+        working-directory: stackhead
+        run: rojo build default.project.json -o build/Stackhead.rbxl
+      - name: Verify place
+        working-directory: stackhead
+        run: lune run tools/verify_place.luau build/Stackhead.rbxl

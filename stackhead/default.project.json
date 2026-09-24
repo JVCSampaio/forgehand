@@ -1,0 +1,63 @@
+{
+  "name": "Stackhead",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      },
+      "Remotes": {
+        "$className": "Folder",
+        "Dash": { "$className": "RemoteEvent" },
+        "UseGlue": { "$className": "RemoteEvent" },
+        "ClaimDaily": { "$className": "RemoteEvent" },
+        "BuyUpgrade": { "$className": "RemoteFunction" },
+        "DataSync": { "$className": "RemoteEvent" },
+        "Notify": { "$className": "RemoteEvent" },
+        "Banked": { "$className": "RemoteEvent" },
+        "Collapsed": { "$className": "RemoteEvent" },
+        "PickedUp": { "$className": "RemoteEvent" },
+        "Bumped": { "$className": "RemoteEvent" }
+      }
+    },
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "$properties": {
+        "CameraMaxZoomDistance": 320,
+        "CharacterWalkSpeed": 16,
+        "CharacterJumpPower": 50,
+        "CharacterUseJumpPower": true
+      },
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    },
+    "Workspace": {
+      "$properties": {
+        "StreamingEnabled": false,
+        "Gravity": 196.2
+      }
+    },
+    "Lighting": {
+      "$properties": {
+        "Technology": "ShadowMap"
+      }
+    },
+    "SoundService": {
+      "$properties": {
+        "RespectFilteringEnabled": true
+      }
+    },
+    "Players": {
+      "$properties": {
+        "CharacterAutoLoads": true
+      }
+    }
+  }
+}
