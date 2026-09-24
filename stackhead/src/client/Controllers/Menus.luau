@@ -7,8 +7,8 @@ local Players = game:GetService("Players")
 local Shared = game:GetService("ReplicatedStorage").Shared
 local UpgradeConfig = require(Shared.Config.UpgradeConfig)
 local MonetizationConfig = require(Shared.Config.MonetizationConfig)
-local GameConfig = require(Shared.Config.GameConfig)
 local Economy = require(Shared.Economy)
+local WorldIndex = require(Shared.WorldIndex)
 local Format = require(Shared.Format)
 local Remotes = require(Shared.Remotes)
 local UIKit = require(script.Parent.UIKit)
@@ -103,7 +103,7 @@ local function formatValue(def, level: number): string
 	if def.Unit == "x" then
 		return Format.multiplier(value)
 	elseif def.Unit == "tier" then
-		local zone = GameConfig.Zones[level]
+		local zone = WorldIndex:zoneForTier(level)
 		return if zone then zone.DisplayName else tostring(level)
 	end
 	return string.format("%g", math.floor(value * 10 + 0.5) / 10)
@@ -294,7 +294,72 @@ function Menus.openShop()
 	end
 end
 
+function Menus.openWorlds()
+	local _, list = makePanel("🌍 WORLDS")
+	local data = ClientState.Data
+	if not data then
+		return
+	end
+	for order, world in WorldIndex.list do
+		local frame = row(list, order, 86)
+		frame.BackgroundColor3 = world.Bank.Floor:Lerp(C.PanelLight, 0.7)
+		UIKit.label({
+			Text = world.Icon .. " " .. world.DisplayName,
+			Size = UDim2.new(0.62, 0, 0, 34),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 12,
+			Parent = frame,
+		})
+		local unlocked = data.Upgrades.Strength >= world.FirstTier
+		local items = {}
+		for _, zone in world.Zones do
+			table.insert(items, zone.DisplayName)
+		end
+		UIKit.label({
+			Text = world.Tagline .. " · " .. table.concat(items, ", "),
+			Position = UDim2.fromOffset(0, 38),
+			Size = UDim2.new(0.62, 0, 0, 32),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextWrapped = true,
+			Font = UIKit.Fonts.Body,
+			TextColor3 = C.SubText,
+			ZIndex = 12,
+			Parent = frame,
+		})
+		local here = data.World == world.Id
+		local button = UIKit.button({
+			Text = if here then "YOU'RE HERE" elseif unlocked then "TRAVEL" else string.format("🔒 💪%d", world.FirstTier),
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, 0, 0.5, 0),
+			Size = UDim2.new(0.34, 0, 0, 58),
+			BackgroundColor3 = if here then C.Disabled elseif unlocked then C.Green else C.Disabled,
+			ZIndex = 12,
+			Parent = frame,
+		})
+		if unlocked and not here then
+			button.Activated:Connect(function()
+				Audio.play("Click")
+				Remotes.Travel:FireServer(world.Id)
+				closePanel()
+			end)
+		elseif not unlocked then
+			button.Activated:Connect(function()
+				Audio.play("Error")
+				HUD.toast(string.format("Reach Strength %d to unlock %s!", world.FirstTier, world.DisplayName), "Error")
+			end)
+		end
+	end
+end
+
 function Menus.init()
+	HUD.menuButton("Worlds").Activated:Connect(function()
+		Audio.play("Click")
+		if openPanel and openPanel.Name == "🌍 WORLDS" then
+			closePanel()
+		else
+			Menus.openWorlds()
+		end
+	end)
 	HUD.menuButton("Upgrades").Activated:Connect(function()
 		Audio.play("Click")
 		if openPanel and openPanel.Name == "⬆️ UPGRADES" then

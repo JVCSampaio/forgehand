@@ -18,6 +18,7 @@ local Wobble = require(Shared.Wobble)
 local StackCodec = require(Shared.StackCodec)
 local Format = require(Shared.Format)
 local Remotes = require(Shared.Remotes)
+local WorldIndex = require(Shared.WorldIndex)
 local UIKit = require(script.Parent.UIKit)
 local ClientState = require(script.Parent.ClientState)
 local Audio = require(script.Parent.Audio)
@@ -202,24 +203,25 @@ local function badge(parent: GuiObject): TextLabel
 end
 
 local function buildMenuButtons()
-	local size = if HUD.isTouch then 76 else 68
+	local size = if HUD.isTouch then 70 else 66
 	-- Left edge, vertically centred: clear of the chat window (top-left)
 	-- and the thumbstick (bottom-left).
 	local column = create("Frame", {
 		Name = "Menu",
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 12, 0.5, 0),
-		Size = UDim2.fromOffset(size, 3 * size + 20),
+		Size = UDim2.fromOffset(size, 4 * size + 24),
 		BackgroundTransparency = 1,
 		Parent = gui,
 	}, {
 		create("UIListLayout", {
-			Padding = UDim.new(0, 10),
+			Padding = UDim.new(0, 8),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
 	})
 	local specs = {
 		{ Id = "Upgrades", Text = "⬆️\nUPGRADE", Color = C.Green },
+		{ Id = "Worlds", Text = "🌍\nWORLDS", Color = C.Blue },
 		{ Id = "Shop", Text = "🛒\nSHOP", Color = C.Purple },
 		{ Id = "Daily", Text = "🎁\nDAILY", Color = C.Gold },
 	}
@@ -438,6 +440,14 @@ local function refreshData()
 		found += 1
 	end
 	collectionLabel.Text = string.format("📖 %d/%d", found, #ItemConfig.Items * (1 + #GameConfig.Spawning.Rarities))
+	-- Badge on WORLDS when a better world is unlocked than the one you're in.
+	local worldsBadge = false
+	for _, world in WorldIndex.list do
+		if data.Upgrades.Strength >= world.FirstTier and data.World and WorldIndex:get(data.World).Index < world.Index then
+			worldsBadge = true
+		end
+	end
+	badges.Worlds.Visible = worldsBadge
 	if lastCoins and data.Coins > lastCoins then
 		UIKit.pop(coinsFrame, 0.12)
 	end

@@ -4,6 +4,7 @@ local ItemConfig = require("../src/shared/Config/ItemConfig")
 local UpgradeConfig = require("../src/shared/Config/UpgradeConfig")
 local MonetizationConfig = require("../src/shared/Config/MonetizationConfig")
 local EconomyConfig = require("../src/shared/Config/EconomyConfig")
+local WorldConfig = require("../src/shared/Config/WorldConfig")
 
 T.describe("Config integrity", function()
 	T.it("item ids are 3 characters and unique", function()
@@ -24,30 +25,61 @@ T.describe("Config integrity", function()
 		end
 	end)
 
-	T.it("every zone tier has items", function()
-		for _, zone in GameConfig.Zones do
-			T.truthy(ItemConfig.ByTier[zone.Tier] and #ItemConfig.ByTier[zone.Tier] > 0, zone.Id)
+	T.it("every world zone tier has items and tiers run 1..N without gaps", function()
+		local expected = 1
+		for _, world in WorldConfig.Worlds do
+			for _, zone in world.Zones do
+				T.eq(zone.Tier, expected, zone.Key)
+				T.truthy(ItemConfig.ByTier[zone.Tier] and #ItemConfig.ByTier[zone.Tier] > 0, zone.Key)
+				expected += 1
+			end
+		end
+		T.eq(#ItemConfig.Items > 0, true)
+		for tier in ItemConfig.ByTier do
+			T.truthy(tier < expected, "items exist for tier " .. tier .. " but no zone spawns them")
 		end
 	end)
 
 	T.it("zones are contiguous rings inside the boundary", function()
-		local previous = GameConfig.Bank.Radius
-		for _, zone in GameConfig.Zones do
-			T.truthy(zone.InnerRadius >= previous - 1e-6, zone.Id .. " starts after previous ring")
-			T.truthy(zone.OuterRadius > zone.InnerRadius, zone.Id)
-			previous = zone.OuterRadius
+		for _, world in WorldConfig.Worlds do
+			local previous = GameConfig.Bank.Radius
+			for _, zone in world.Zones do
+				T.truthy(zone.InnerRadius >= previous - 1e-6, zone.Key .. " starts after previous ring")
+				T.truthy(zone.OuterRadius > zone.InnerRadius, zone.Key)
+				previous = zone.OuterRadius
+			end
+			T.truthy(previous <= GameConfig.Layout.BoundaryRadius)
 		end
-		T.truthy(previous <= GameConfig.World.BoundaryRadius)
 	end)
 
-	T.it("strength max matches the highest zone tier", function()
+	T.it("worlds don't overlap", function()
+		T.truthy(WorldConfig.Spacing > 2 * GameConfig.Layout.OceanRadius, "oceans overlap")
+	end)
+
+	T.it("strength max matches the highest tier", function()
 		local highest = 0
-		for _, zone in GameConfig.Zones do
-			highest = math.max(highest, zone.Tier)
+		for _, world in WorldConfig.Worlds do
+			for _, zone in world.Zones do
+				highest = math.max(highest, zone.Tier)
+			end
 		end
 		T.eq(UpgradeConfig.Upgrades.Strength.MaxLevel, highest)
 		T.eq(#UpgradeConfig.Upgrades.Strength.Costs, highest - 1)
 		T.eq(#EconomyConfig.TierScale, highest)
+	end)
+
+	T.it("item values rise with tier", function()
+		local previousMax = 0
+		for tier = 1, #EconomyConfig.TierScale do
+			local minValue = math.huge
+			local maxValue = 0
+			for _, item in ItemConfig.ByTier[tier] do
+				minValue = math.min(minValue, item.Value)
+				maxValue = math.max(maxValue, item.Value)
+			end
+			T.truthy(minValue > previousMax * 0.5, "tier " .. tier .. " cheapest item should beat half of the previous best")
+			previousMax = maxValue
+		end
 	end)
 
 	T.it("upgrade order lists every upgrade", function()

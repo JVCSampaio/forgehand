@@ -39,7 +39,7 @@ T.describe("Economy", function()
 		local strength = UpgradeConfig.Upgrades.Strength
 		T.eq(Economy.upgradeCost(strength, 1), strength.Costs[1])
 		T.eq(Economy.upgradeCost(strength, 3), strength.Costs[3])
-		T.eq(Economy.upgradeCost(strength, 4), nil)
+		T.eq(Economy.upgradeCost(strength, strength.MaxLevel), nil)
 	end)
 
 	T.it("every upgrade has a cost for every level below max", function()

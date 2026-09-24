@@ -6,10 +6,10 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
-local GameConfig = require(Shared.Config.GameConfig)
 local UpgradeConfig = require(Shared.Config.UpgradeConfig)
 local EconomyConfig = require(Shared.Config.EconomyConfig)
 local Economy = require(Shared.Economy)
+local WorldIndex = require(Shared.WorldIndex)
 local Format = require(Shared.Format)
 local UIKit = require(script.Parent.UIKit)
 local ClientState = require(script.Parent.ClientState)
@@ -25,6 +25,7 @@ local highlight: Highlight
 local lockTag: BillboardGui
 local lockText: TextLabel
 local itemsFolder: Folder
+local bankAttachment: Attachment
 local lastText = ""
 
 local function setObjective(text: string, color: Color3?)
@@ -91,6 +92,8 @@ local function update()
 		return
 	end
 	ensureBeam(root)
+	local here = WorldIndex:at(root.Position)
+	bankAttachment.WorldPosition = here.Origin + Vector3.new(0, 3, 0)
 	local count = #ClientState.stackCodes()
 	local wobble = ClientState.wobble()
 	local strength = data.Upgrades.Strength
@@ -114,9 +117,15 @@ local function update()
 		setObjective("Carry your stack to the BANK in the middle!", UIKit.Colors.Gold)
 		showBeam = true
 	elseif count == 0 and strengthCost and data.Coins >= strengthCost then
-		local zone = GameConfig.Zones[strength + 1]
-		setObjective(string.format("💪 Buy Strength to unlock %s!", zone and zone.DisplayName or "a new zone"), UIKit.Colors.Gold)
+		local zone = WorldIndex:zoneForTier(strength + 1)
+		local world = WorldIndex:worldForTier(strength + 1)
+		local target = if world and world.FirstTier == strength + 1 then world.DisplayName else (zone and zone.DisplayName or "a new zone")
+		setObjective(string.format("💪 Buy Strength to unlock %s!", target), UIKit.Colors.Gold)
 		UIKit.pop(HUD.menuButton("Upgrades"), 0.05)
+	elseif count == 0 and WorldIndex:worldForTier(strength) ~= here and here.FirstTier < strength then
+		local best = WorldIndex:worldForTier(strength)
+		setObjective(string.format("%s %s pays way more. Open WORLDS to travel!", best.Icon, best.DisplayName), UIKit.Colors.Gold)
+		UIKit.pop(HUD.menuButton("Worlds"), 0.05)
 	elseif count == 0 and data.Upgrades.Speed + data.Upgrades.Reach + data.Upgrades.Balance == 0 and cheapest and data.Coins >= cheapest then
 		setObjective("Open UPGRADE and buy your first upgrade!", UIKit.Colors.Green)
 		UIKit.pop(HUD.menuButton("Upgrades"), 0.05)
@@ -169,9 +178,9 @@ function Guide.init()
 	UIKit.textLimit(objective, 30)
 	UIKit.create("UIScale", { Parent = objective })
 
-	local bankAttachment = Instance.new("Attachment")
+	bankAttachment = Instance.new("Attachment")
 	bankAttachment.Name = "BankGuide"
-	bankAttachment.WorldPosition = GameConfig.Bank.Position + Vector3.new(0, 3, 0)
+	bankAttachment.WorldPosition = Vector3.new(0, 3, 0)
 	bankAttachment.Parent = Workspace.Terrain
 	beam = Instance.new("Beam")
 	beam.Attachment1 = bankAttachment

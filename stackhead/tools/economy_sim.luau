@@ -9,11 +9,15 @@
 --   walks with a turn every ~1.5 s, and stands still whenever wobble > 0.6
 -- * the bot buys the cheapest useful upgrade, preferring Strength when affordable
 
+local process = require("@lune/process")
 local roblox = require("@lune/roblox")
 Vector3 = roblox.Vector3
 Color3 = roblox.Color3
 
 local GameConfig = require("../src/shared/Config/GameConfig")
+local WorldConfig = require("../src/shared/Config/WorldConfig")
+local Worlds = require("../src/shared/Worlds")
+local WorldIndex = Worlds.new(WorldConfig)
 local EconomyConfig = require("../src/shared/Config/EconomyConfig")
 local ItemConfig = require("../src/shared/Config/ItemConfig")
 local UpgradeConfig = require("../src/shared/Config/UpgradeConfig")
@@ -128,7 +132,7 @@ local function trip(s, zone, target: number)
 end
 
 local function bestTrip(s)
-	local zone = GameConfig.Zones[s.Strength]
+	local zone = WorldIndex:zoneForTier(s.Strength)
 	local best = nil
 	for _, target in { 5, 8, 12, 16, 20, 25, 30, 40, 50, 65, 80, 100, 130, 160, 200 } do
 		local savedRng = rng
@@ -162,7 +166,13 @@ local function tryBuy()
 		if strengthCost and coins >= strengthCost then
 			coins -= strengthCost
 			upgrades.Strength += 1
-			log(string.format("Strength %d -> unlocks %s", upgrades.Strength, GameConfig.Zones[upgrades.Strength].DisplayName))
+			local zone = WorldIndex:zoneForTier(upgrades.Strength)
+			local world = WorldIndex:worldForTier(upgrades.Strength)
+			if world.FirstTier == upgrades.Strength then
+				log(string.format("Strength %d -> NEW WORLD %s", upgrades.Strength, world.DisplayName))
+			else
+				log(string.format("Strength %d -> unlocks %s", upgrades.Strength, zone.DisplayName))
+			end
 			bought = true
 		else
 			local cheapestId, cheapestCost = nil, math.huge
@@ -187,7 +197,9 @@ local function tryBuy()
 	end
 end
 
-local SESSION = 60 * 60
+local SESSION = tonumber((process.args[1])) or 8 * 60 * 60
+-- Per-tier income, for calibrating Strength costs (--rates).
+local tierTime, tierCoins = {}, {}
 local nextReport = 5 * 60
 while clock < SESSION do
 	local s = stats(upgrades)
@@ -196,13 +208,15 @@ while clock < SESSION do
 	if banks < 2 then
 		plan.Target = if banks == 0 then 6 else 12
 	end
-	local gained, time, count = trip(s, GameConfig.Zones[s.Strength], plan.Target)
+	local gained, time, count = trip(s, WorldIndex:zoneForTier(s.Strength), plan.Target)
 	clock += time
 	if banks == 0 then
 		gained += EconomyConfig.FirstBankBonus
 	end
 	coins += gained
 	banks += 1
+	tierTime[s.Strength] = (tierTime[s.Strength] or 0) + time
+	tierCoins[s.Strength] = (tierCoins[s.Strength] or 0) + gained
 	if not firstBank then
 		firstBank = clock
 		log(string.format("First bank: %d items, +%d coins", count, gained))
@@ -226,11 +240,19 @@ while clock < SESSION do
 			upgrades.Balance,
 			upgrades.Strength
 		))
-		nextReport += 5 * 60
+		nextReport += if clock < 3600 then 5 * 60 else 30 * 60
 	end
 end
 
-print("Stackhead pacing simulation (solo bot, first hour)")
+print(string.format("Stackhead pacing simulation (solo bot, %.0f h)", SESSION / 3600))
 for _, line in events do
 	print(line)
+end
+
+if process.args[2] == "--rates" then
+	for tier = 1, WorldIndex:maxTier() do
+		if tierTime[tier] then
+			print(string.format("RATE %d %.0f %.1f", tier, tierCoins[tier] / tierTime[tier] * 60, tierTime[tier] / 60))
+		end
+	end
 end

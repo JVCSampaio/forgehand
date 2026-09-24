@@ -15,6 +15,7 @@ local Economy = require(Shared.Economy)
 local Wobble = require(Shared.Wobble)
 local StackCodec = require(Shared.StackCodec)
 local Remotes = require(Shared.Remotes)
+local WorldIndex = require(Shared.WorldIndex)
 local RateLimiter = require(script.Parent.Parent.Util.RateLimiter)
 local DataService = require(script.Parent.DataService)
 local ItemSpawnService = require(script.Parent.ItemSpawnService)
@@ -80,10 +81,15 @@ function StackService.getState(player: Player): PlayerState?
 	return states[player]
 end
 
+-- Every world has a bank at its centre.
 local function isInBank(position: Vector3): boolean
-	local bank = GameConfig.Bank
-	local offset = position - bank.Position
-	return Vector2.new(offset.X, offset.Z).Magnitude <= bank.Radius and offset.Y <= bank.MaxHeightAbove
+	local world = WorldIndex:at(position)
+	local offset = position - world.Origin
+	return Vector2.new(offset.X, offset.Z).Magnitude <= GameConfig.Bank.Radius and offset.Y <= GameConfig.Bank.MaxHeightAbove
+end
+
+function StackService.isInBank(position: Vector3): boolean
+	return isInBank(position)
 end
 
 local function recomputeHeight(state: PlayerState)
@@ -180,21 +186,21 @@ local function bank(player: Player, state: PlayerState, profile)
 	DataService.changed(player)
 end
 
+-- Landing spot for a fallen item: near the player, outside the bank, inside the island.
 local function scatterPoint(origin: Vector3): Vector3
 	local loose = GameConfig.Loose
+	local centre = WorldIndex:at(origin).Origin
 	local angle = math.random() * math.pi * 2
 	local distance = loose.ScatterMin + math.random() * (loose.ScatterMax - loose.ScatterMin)
-	local point = Vector3.new(origin.X + math.cos(angle) * distance, GameConfig.World.GroundY, origin.Z + math.sin(angle) * distance)
-	local flat = Vector2.new(point.X, point.Z)
+	local flat = Vector2.new(origin.X - centre.X + math.cos(angle) * distance, origin.Z - centre.Z + math.sin(angle) * distance)
 	local r = flat.Magnitude
 	local minR = GameConfig.Bank.Radius + 3
-	local maxR = GameConfig.World.BoundaryRadius - 6
+	local maxR = GameConfig.Layout.BoundaryRadius - 6
 	if r < minR or r > maxR then
 		local unit = if r > 0.01 then flat.Unit else Vector2.new(1, 0)
-		local clamped = unit * math.clamp(r, minR, maxR)
-		point = Vector3.new(clamped.X, GameConfig.World.GroundY, clamped.Y)
+		flat = unit * math.clamp(r, minR, maxR)
 	end
-	return point
+	return Vector3.new(centre.X + flat.X, GameConfig.Layout.GroundY, centre.Z + flat.Y)
 end
 
 -- keepOverride = 0 drops everything (death). Glue only protects wobble collapses.

@@ -16,7 +16,7 @@ end
 
 local Schema = {}
 
-Schema.CURRENT_VERSION = 1
+Schema.CURRENT_VERSION = 2
 
 function Schema.defaults(economyConfig, upgradeConfig)
 	local upgrades = {}
@@ -49,11 +49,21 @@ function Schema.defaults(economyConfig, upgradeConfig)
 		Purchases = {},
 		PurchaseOrder = {},
 		Settings = { Music = true, Sfx = true },
+		-- v2
+		LastWorld = "",
+		Orders = { Day = 0, Progress = { 0, 0, 0 }, Claimed = { false, false, false } },
+		Cosmetics = { Owned = {}, Equipped = "" },
+		Flags = { StarterPack = false },
 	}
 end
 
 -- Each entry migrates data FROM version index-1... e.g. MIGRATIONS[2] turns v1 into v2.
-local MIGRATIONS: { [number]: (any) -> any } = {}
+local MIGRATIONS: { [number]: (any) -> any } = {
+	-- v2 added worlds, daily orders and cosmetics; defaults fill them in.
+	[2] = function(data)
+		return data
+	end,
+}
 
 function Schema.migrate(data)
 	local version = tonumber(data.Version) or 0
@@ -124,6 +134,43 @@ function Schema.sanitize(data, economyConfig, upgradeConfig)
 			if type(id) == "string" and data.Purchases[id] ~= nil then
 				table.insert(out.PurchaseOrder, id)
 				out.Purchases[id] = true
+			end
+		end
+	end
+
+	if type(data.LastWorld) == "string" and #data.LastWorld <= 32 then
+		out.LastWorld = data.LastWorld
+	end
+
+	if type(data.Orders) == "table" then
+		out.Orders.Day = math.floor(finiteNumber(data.Orders.Day, 0, 0, 1e7))
+		for i = 1, 3 do
+			if type(data.Orders.Progress) == "table" then
+				out.Orders.Progress[i] = math.floor(finiteNumber(data.Orders.Progress[i], 0, 0, 1e9))
+			end
+			if type(data.Orders.Claimed) == "table" then
+				out.Orders.Claimed[i] = data.Orders.Claimed[i] == true
+			end
+		end
+	end
+
+	if type(data.Cosmetics) == "table" then
+		if type(data.Cosmetics.Owned) == "table" then
+			for id, owned in data.Cosmetics.Owned do
+				if type(id) == "string" and owned == true then
+					out.Cosmetics.Owned[id] = true
+				end
+			end
+		end
+		if type(data.Cosmetics.Equipped) == "string" and #data.Cosmetics.Equipped <= 32 then
+			out.Cosmetics.Equipped = data.Cosmetics.Equipped
+		end
+	end
+
+	if type(data.Flags) == "table" then
+		for key, default in defaults.Flags do
+			if type(data.Flags[key]) == type(default) then
+				out.Flags[key] = data.Flags[key]
 			end
 		end
 	end

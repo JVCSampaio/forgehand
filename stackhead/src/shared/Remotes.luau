@@ -11,6 +11,9 @@ local Remotes = {
 	UseGlue = folder:WaitForChild("UseGlue") :: RemoteEvent,
 	ClaimDaily = folder:WaitForChild("ClaimDaily") :: RemoteEvent,
 	BuyUpgrade = folder:WaitForChild("BuyUpgrade") :: RemoteFunction,
+	Travel = folder:WaitForChild("Travel") :: RemoteEvent,
+	ClaimOrder = folder:WaitForChild("ClaimOrder") :: RemoteEvent,
+	EquipCosmetic = folder:WaitForChild("EquipCosmetic") :: RemoteEvent,
 	-- server -> client
 	DataSync = folder:WaitForChild("DataSync") :: RemoteEvent,
 	Notify = folder:WaitForChild("Notify") :: RemoteEvent,

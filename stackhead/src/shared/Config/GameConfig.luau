@@ -8,19 +8,20 @@ GameConfig.Version = "0.1.0"
 -- Server simulation rate for pickups, wobble, banking and bumps.
 GameConfig.TickRate = 10
 
-GameConfig.World = {
-	Seed = 1337,
+-- Island layout shared by every world (see WorldConfig for the worlds).
+GameConfig.Layout = {
 	GroundY = 0,
 	-- Players can't walk past this radius (invisible wall ring).
 	BoundaryRadius = 300,
 	BoundarySegments = 28,
-	OceanRadius = 900,
+	OceanRadius = 1100,
+	-- Width of the four radial streets that lead out from the bank.
+	RoadWidth = 12,
 }
 
--- The bank sits at the centre of the map. Standing inside it cashes in the
+-- Every world has a bank at its centre. Standing inside it cashes in the
 -- stack and protects the player from bumps.
 GameConfig.Bank = {
-	Position = Vector3.new(0, 0, 0),
 	Radius = 20,
 	SpawnRadius = 27,
 	SpawnCount = 8,
@@ -28,44 +29,8 @@ GameConfig.Bank = {
 	MaxHeightAbove = 14,
 }
 
--- Concentric rings. Items of a zone only spawn inside its ring.
-GameConfig.Zones = {
-	{
-		Id = "Market",
-		DisplayName = "Market Street",
-		InnerRadius = 26,
-		OuterRadius = 85,
-		Tier = 1,
-		MaxItems = 110,
-		GroundColor = Color3.fromRGB(233, 205, 150),
-	},
-	{
-		Id = "Yard",
-		DisplayName = "Yard Sale",
-		InnerRadius = 85,
-		OuterRadius = 150,
-		Tier = 2,
-		MaxItems = 90,
-		GroundColor = Color3.fromRGB(128, 196, 96),
-	},
-	{
-		Id = "Farm",
-		DisplayName = "Old Farm",
-		InnerRadius = 150,
-		OuterRadius = 220,
-		Tier = 3,
-		MaxItems = 80,
-		GroundColor = Color3.fromRGB(176, 140, 88),
-	},
-	{
-		Id = "Docks",
-		DisplayName = "The Docks",
-		InnerRadius = 220,
-		OuterRadius = 290,
-		Tier = 4,
-		MaxItems = 60,
-		GroundColor = Color3.fromRGB(150, 120, 96),
-	},
+GameConfig.Travel = {
+	Cooldown = 3,
 }
 
 GameConfig.Spawning = {
@@ -105,7 +70,7 @@ GameConfig.Wobble = {
 	-- Horizontal speed below which the player counts as standing still.
 	StillSpeed = 1.5,
 	-- Balance multiplier per Balance upgrade level.
-	BalancePerLevel = 0.22,
+	BalancePerLevel = 0.15,
 	-- Fraction of the stack kept on collapse (bottom part).
 	CollapseKeepFraction = 0.5,
 	-- Seconds of immunity after a collapse.

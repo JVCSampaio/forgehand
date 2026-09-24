@@ -1,6 +1,7 @@
 -- Client-only juice: items flying onto the stack, loose items falling from
 -- collapsed stacks and item rain, stacks pouring into the bank, camera shake.
 
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -10,6 +11,7 @@ local GameConfig = require(Shared.Config.GameConfig)
 local ItemBuilder = require(Shared.ItemBuilder)
 local StackCodec = require(Shared.StackCodec)
 local Remotes = require(Shared.Remotes)
+local WorldIndex = require(Shared.WorldIndex)
 local Audio = require(script.Parent.Audio)
 local StackRenderer = require(script.Parent.StackRenderer)
 local ClientState = require(script.Parent.ClientState)
@@ -165,17 +167,22 @@ local function updateShake()
 	camera.CFrame *= CFrame.Angles(math.rad(math.sin(now * 55) * s), math.rad(math.cos(now * 47) * s), 0)
 end
 
-local function spinBankCoin()
-	local map = Workspace:WaitForChild("Map", 30)
-	local coin = map and map:WaitForChild("BankCoin", 30) :: BasePart?
-	if not coin then
-		return
+-- Bank coins spin locally. Tagged parts stream in and out with the world.
+local spinners: { [BasePart]: Vector3 } = {}
+local function trackSpinner(instance: Instance)
+	if instance:IsA("BasePart") then
+		spinners[instance] = instance.Position
 	end
-	local base = coin.CFrame
-	RunService.RenderStepped:Connect(function()
-		local t = os.clock()
-		coin.CFrame = CFrame.new(base.Position + Vector3.new(0, math.sin(t * 1.5) * 0.8, 0)) * CFrame.Angles(0, t * 1.2, 0) * CFrame.Angles(0, 0, math.rad(90))
-	end)
+end
+local function spinCoins()
+	local t = os.clock()
+	for coin, base in spinners do
+		if coin.Parent then
+			coin.CFrame = CFrame.new(base + Vector3.new(0, math.sin(t * 1.5) * 0.8, 0)) * CFrame.Angles(0, t * 1.2, 0) * CFrame.Angles(0, 0, math.rad(90))
+		else
+			spinners[coin] = nil
+		end
+	end
 end
 
 local function stackTop(): Vector3
@@ -194,7 +201,7 @@ local function nearBank(): boolean
 	if not root then
 		return false
 	end
-	local offset = root.Position - GameConfig.Bank.Position
+	local offset = root.Position - WorldIndex:at(root.Position).Origin
 	return Vector2.new(offset.X, offset.Z).Magnitude < GameConfig.Bank.Radius + 6
 end
 
@@ -205,7 +212,11 @@ function ItemFx.init()
 
 	RunService:BindToRenderStep("ItemFlights", Enum.RenderPriority.Character.Value + 2, updateFlights)
 	RunService:BindToRenderStep("CameraShake", Enum.RenderPriority.Camera.Value + 1, updateShake)
-	task.spawn(spinBankCoin)
+	CollectionService:GetInstanceAddedSignal("Spin"):Connect(trackSpinner)
+	for _, coin in CollectionService:GetTagged("Spin") do
+		trackSpinner(coin)
+	end
+	RunService.RenderStepped:Connect(spinCoins)
 
 	local itemsFolder = Workspace:WaitForChild("Items")
 	itemsFolder.ChildAdded:Connect(function(child)
@@ -238,7 +249,10 @@ function ItemFx.init()
 		if player ~= localPlayer or not nearBank() then
 			return
 		end
-		local bankTarget = GameConfig.Bank.Position + Vector3.new(0, 16, 0)
+		local character = localPlayer.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local centre = if root then WorldIndex:at(root.Position).Origin else Vector3.zero
+		local bankTarget = centre + Vector3.new(0, 16, 0)
 		for i, entry in removed do
 			if i > 40 then
 				break

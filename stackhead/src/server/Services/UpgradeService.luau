@@ -2,7 +2,7 @@
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local UpgradeConfig = require(Shared.Config.UpgradeConfig)
-local GameConfig = require(Shared.Config.GameConfig)
+local WorldIndex = require(Shared.WorldIndex)
 local Economy = require(Shared.Economy)
 local Remotes = require(Shared.Remotes)
 local RateLimiter = require(script.Parent.Parent.Util.RateLimiter)
@@ -43,14 +43,18 @@ function UpgradeService.buy(player: Player, upgradeId: unknown): (boolean, any)
 	Analytics.sink(player, cost, profile.Coins, Enum.AnalyticsEconomyTransactionType.Shop.Name, upgradeId .. "_" .. (level + 1))
 	Analytics.funnel(player, profile, "FirstUpgrade")
 	if upgradeId == "Strength" then
-		local zone = GameConfig.Zones[level + 1]
-		Analytics.progression(player, "Strength", level + 1, zone and zone.Id or "")
+		local zone = WorldIndex:zoneForTier(level + 1)
+		local world = WorldIndex:worldForTier(level + 1)
+		Analytics.progression(player, "Strength", level + 1, zone and zone.Key or "")
 		if level + 1 == 2 then
 			Analytics.funnel(player, profile, "UnlockedYard")
 		elseif level + 1 == 3 then
 			Analytics.funnel(player, profile, "UnlockedFarm")
 		end
-		if zone then
+		if world and world.FirstTier == level + 1 then
+			Remotes.Notify:FireClient(player, { Kind = "Unlock", Text = world.Icon .. " " .. world.DisplayName .. " unlocked! Open WORLDS to travel." })
+			Analytics.custom(player, "WorldUnlocked_" .. world.Id)
+		elseif zone then
 			Remotes.Notify:FireClient(player, { Kind = "Unlock", Text = zone.DisplayName .. " unlocked! Heavier items = more coins." })
 		end
 	end

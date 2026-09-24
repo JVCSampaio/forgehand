@@ -1,8 +1,8 @@
 -- Global "Tallest Stack" board (OrderedDataStore) shown next to the bank.
 
+local CollectionService = game:GetService("CollectionService")
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local GameConfig = require(Shared.Config.GameConfig)
@@ -31,7 +31,10 @@ local function nameFor(userId: number): string
 end
 
 local function buildBoard()
-	local board = Workspace:WaitForChild("Map"):WaitForChild("Leaderboard")
+	local board = CollectionService:GetTagged("Leaderboard")[1]
+	if not board then
+		return
+	end
 	-- Both faces, so the board reads from the bank and from the spawns.
 	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
 		local gui = Instance.new("SurfaceGui")

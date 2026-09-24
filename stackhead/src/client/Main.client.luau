@@ -5,6 +5,7 @@ local Controllers = script.Parent:WaitForChild("Controllers")
 local order = {
 	"ClientState",
 	"Audio",
+	"WorldAmbience",
 	"StackRenderer",
 	"ItemFx",
 	"HUD",

@@ -75,6 +75,38 @@ roblox.implementMethod("Workspace", "GetPartBoundsInRadius", function(_, positio
 	return hits
 end)
 
+-- CollectionService: Lune's DOM routes AddTag to Instance.AddTag, so scripts
+-- get a stand-in service through a proxied `game`.
+local tagged: { [string]: { any } } = {}
+local collectionService = {
+	AddTag = function(_, instance, tag)
+		tagged[tag] = tagged[tag] or {}
+		table.insert(tagged[tag], instance)
+	end,
+	GetTagged = function(_, tag)
+		return tagged[tag] or {}
+	end,
+}
+local gameProxy = setmetatable({
+	GetService = function(_, name)
+		if name == "CollectionService" then
+			return collectionService
+		end
+		return game:GetService(name)
+	end,
+}, {
+	__index = function(_, key)
+		return game[key]
+	end,
+})
+if not Workspace:FindFirstChild("Terrain") then
+	local terrain = roblox.Instance.new("Terrain")
+	terrain.Parent = Workspace
+end
+roblox.implementProperty("Workspace", "Terrain", function(self)
+	return self:FindFirstChild("Terrain")
+end)
+
 local taskShim = {
 	spawn = function() end, -- background loops are not needed for a still frame
 	delay = function() end,
@@ -86,7 +118,7 @@ local taskShim = {
 local cache = {}
 local function makeEnv(scriptInstance)
 	local env = {
-		game = game,
+		game = gameProxy,
 		workspace = Workspace,
 		script = scriptInstance,
 		Instance = roblox.Instance,
@@ -225,30 +257,34 @@ local function actor(name, position, yaw, colors, codes, lean)
 	end
 end
 
--- Hero heading back to the bank with a 28 stack from the market.
-actor("Hero", roblox.Vector3.new(0, 0.4, 44), 0, noob, randomStack({ 1 }, 28, 7), roblox.Vector2.new(0.05, 0.22))
--- A show-off with an 85-item tower bending dangerously in the Yard Sale.
-actor("Tower", roblox.Vector3.new(-26, 0.3, 104), 150, purple, randomStack({ 1, 2 }, 85, 11), roblox.Vector2.new(-0.55, 0.35))
--- A small player dashing toward the tower (the bump that topples giants).
-actor("Bumper", roblox.Vector3.new(-18, 0.3, 96), 120, red, randomStack({ 1 }, 4, 3), roblox.Vector2.zero)
--- Someone banking at the centre.
-actor("Banker", roblox.Vector3.new(6, 0.61, -4), 30, white, randomStack({ 1, 2 }, 16, 21), roblox.Vector2.new(0.1, 0))
-
--- Collapse aftermath: loose items scattered around a player in the Market.
-local collapseAt = roblox.Vector3.new(34, 0.4, 30)
-actor("Crashed", collapseAt, 220, red, randomStack({ 1 }, 9, 5), roblox.Vector2.zero)
-local debris = randomStack({ 1 }, 14, 9)
-for i, code in debris do
-	local angle = i * 2.39
-	local dist = 4 + (i % 5) * 2.2
-	local model = ItemBuilder.build(code)
-	local h = ItemBuilder.definition(code).Height
-	ItemBuilder.pivot(
-		model,
-		roblox.CFrame.new(collapseAt + roblox.Vector3.new(math.cos(angle) * dist, h / 2 + 0.1, math.sin(angle) * dist))
-			* roblox.CFrame.Angles(0.4 * (i % 3), angle, 0.3 * (i % 2))
-	)
-	model.Parent = actors
+-- The same little scene in every world, using that world's item tiers:
+-- a hero walking back to the bank, a leaning tower, a bumper, a banker and
+-- a fresh collapse.
+local WorldIndex = host.require(Shared.WorldIndex)
+for _, world in WorldIndex.list do
+	local o = world.Origin
+	local t = world.FirstTier
+	local function at(x, y, z)
+		return o + roblox.Vector3.new(x, y, z)
+	end
+	actor("Hero", at(0, 0.4, 44), 0, noob, randomStack({ t }, 28, 7 + t), roblox.Vector2.new(0.05, 0.22))
+	actor("Tower", at(-26, 0.3, 104), 150, purple, randomStack({ t, t + 1 }, 85, 11 + t), roblox.Vector2.new(-0.55, 0.35))
+	actor("Bumper", at(-18, 0.3, 96), 120, red, randomStack({ t }, 4, 3 + t), roblox.Vector2.zero)
+	actor("Banker", at(6, 0.61, -4), 30, white, randomStack({ t, t + 1 }, 16, 21 + t), roblox.Vector2.new(0.1, 0))
+	local collapseAt = at(34, 0.4, 30)
+	actor("Crashed", collapseAt, 220, red, randomStack({ t }, 9, 5 + t), roblox.Vector2.zero)
+	for i, code in randomStack({ t }, 14, 9 + t) do
+		local angle = i * 2.39
+		local dist = 4 + (i % 5) * 2.2
+		local model = ItemBuilder.build(code)
+		local h = ItemBuilder.definition(code).Height
+		ItemBuilder.pivot(
+			model,
+			roblox.CFrame.new(collapseAt + roblox.Vector3.new(math.cos(angle) * dist, h / 2 + 0.1, math.sin(angle) * dist))
+				* roblox.CFrame.Angles(0.4 * (i % 3), angle, 0.3 * (i % 2))
+		)
+		model.Parent = actors
+	end
 end
 
 -- Export.
@@ -258,7 +294,7 @@ local function round(n)
 	return math.floor(n * 1000 + 0.5) / 1000
 end
 for _, inst in Workspace:GetDescendants() do
-	if inst:IsA("BasePart") and inst.Transparency < 1 then
+	if inst:IsA("BasePart") and inst.ClassName ~= "Terrain" and inst.Transparency < 1 then
 		local cf = inst.CFrame
 		local x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 = cf:GetComponents()
 		table.insert(parts, {

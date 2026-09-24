@@ -11,6 +11,7 @@ local order = {
 	"ItemSpawnService",
 	"StackService",
 	"UpgradeService",
+	"TravelService",
 	"SessionService",
 	"EventService",
 	"LeaderboardService",

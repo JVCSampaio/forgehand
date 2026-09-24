@@ -8,16 +8,45 @@
       },
       "Remotes": {
         "$className": "Folder",
-        "Dash": { "$className": "RemoteEvent" },
-        "UseGlue": { "$className": "RemoteEvent" },
-        "ClaimDaily": { "$className": "RemoteEvent" },
-        "BuyUpgrade": { "$className": "RemoteFunction" },
-        "DataSync": { "$className": "RemoteEvent" },
-        "Notify": { "$className": "RemoteEvent" },
-        "Banked": { "$className": "RemoteEvent" },
-        "Collapsed": { "$className": "RemoteEvent" },
-        "PickedUp": { "$className": "RemoteEvent" },
-        "Bumped": { "$className": "RemoteEvent" }
+        "Dash": {
+          "$className": "RemoteEvent"
+        },
+        "UseGlue": {
+          "$className": "RemoteEvent"
+        },
+        "ClaimDaily": {
+          "$className": "RemoteEvent"
+        },
+        "BuyUpgrade": {
+          "$className": "RemoteFunction"
+        },
+        "DataSync": {
+          "$className": "RemoteEvent"
+        },
+        "Notify": {
+          "$className": "RemoteEvent"
+        },
+        "Banked": {
+          "$className": "RemoteEvent"
+        },
+        "Collapsed": {
+          "$className": "RemoteEvent"
+        },
+        "PickedUp": {
+          "$className": "RemoteEvent"
+        },
+        "Bumped": {
+          "$className": "RemoteEvent"
+        },
+        "Travel": {
+          "$className": "RemoteEvent"
+        },
+        "ClaimOrder": {
+          "$className": "RemoteEvent"
+        },
+        "EquipCosmetic": {
+          "$className": "RemoteEvent"
+        }
       }
     },
     "ServerScriptService": {
@@ -40,8 +69,10 @@
     },
     "Workspace": {
       "$properties": {
-        "StreamingEnabled": false,
-        "Gravity": 196.2
+        "StreamingEnabled": true,
+        "Gravity": 196.2,
+        "StreamingTargetRadius": 700,
+        "StreamingMinRadius": 200
       }
     },
     "Lighting": {

@@ -17,12 +17,16 @@ const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--ena
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on('console', (m) => { if (m.type() === 'error') console.log('console:', m.text()); });
 page.on('pageerror', (e) => console.log('pageerror:', e.message));
-for (const view of ['overview', 'gameplay', 'tower', 'bank', 'collapse']) {
-  await page.goto(`${base}/index.html?view=${view}`);
-  await page.waitForFunction(() => document.title === 'ready', null, { timeout: 180000 });
-  await page.evaluate(() => document.fonts.ready);
-  await page.waitForTimeout(300);
-  await page.screenshot({ path: `${out}/${view}.png` });
-  console.log('shot', view);
+const WORLDS = (process.env.WORLDS ?? 'Stackville:0 Frostpeak:2400 CandyCoast:4800 NeonCity:7200').split(' ').map((w) => w.split(':'));
+const VIEWS = (process.env.VIEWS ?? 'overview gameplay').split(' ');
+for (const [name, x] of WORLDS) {
+  for (const view of VIEWS) {
+    await page.goto(`${base}/index.html?view=${view}&x=${x}`);
+    await page.waitForFunction(() => document.title === 'ready', null, { timeout: 240000 });
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${out}/${name}-${view}.png` });
+    console.log('shot', name, view);
+  }
 }
 await browser.close();

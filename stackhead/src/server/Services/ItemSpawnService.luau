@@ -9,6 +9,7 @@ local GameConfig = require(Shared.Config.GameConfig)
 local ItemConfig = require(Shared.Config.ItemConfig)
 local ItemBuilder = require(Shared.ItemBuilder)
 local StackCodec = require(Shared.StackCodec)
+local WorldIndex = require(Shared.WorldIndex)
 local WorldService = require(script.Parent.WorldService)
 
 local ItemSpawnService = {}
@@ -73,9 +74,9 @@ local function tooCloseToItems(position: Vector3): boolean
 	return #hits > 0
 end
 
-local function findSpot(inner: number, outer: number): Vector3?
+local function findSpot(world, inner: number, outer: number): Vector3?
 	for _ = 1, GameConfig.Spawning.PlacementAttempts do
-		local point = WorldService.randomPointInRing(rng, inner + 2, outer - 2)
+		local point = WorldService.randomPointInRing(rng, world, inner + 2, outer - 2)
 		if not WorldService.isNearObstacle(point, 2) and not tooCloseToItems(point) then
 			return point
 		end
@@ -97,11 +98,14 @@ local function place(code: string, groundPosition: Vector3, info: ItemInfo, attr
 	local def = info.Def
 	local yaw = CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
 	local floor = WorldService.groundTopAt(groundPosition)
-	ItemBuilder.pivot(model, CFrame.new(groundPosition.X, floor + def.Height / 2 + 0.05, groundPosition.Z) * yaw)
+	-- 0.15 clears the street surface, which sits just above the ring floor.
+	ItemBuilder.pivot(model, CFrame.new(groundPosition.X, floor + def.Height / 2 + 0.15, groundPosition.Z) * yaw)
 	local root = model.PrimaryPart :: BasePart
 	-- Only the root is queryable so each item is one overlap hit.
 	root.CanQuery = true
 	model:SetAttribute("Tier", def.Tier)
+	-- Stream items as a whole so clients never see half an item.
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	registry[model] = info
 	rootToModel[root] = model
 	model.Parent = itemsFolder
@@ -109,7 +113,7 @@ local function place(code: string, groundPosition: Vector3, info: ItemInfo, attr
 end
 
 function ItemSpawnService.spawnInZone(zone, rarityBoost: number?): Model?
-	local spot = findSpot(zone.InnerRadius, zone.OuterRadius)
+	local spot = findSpot(WorldIndex:get(zone.WorldId), zone.InnerRadius, zone.OuterRadius)
 	if not spot then
 		return nil
 	end
@@ -119,11 +123,11 @@ function ItemSpawnService.spawnInZone(zone, rarityBoost: number?): Model?
 		Code = code,
 		Def = def,
 		RarityMult = ItemSpawnService.rarityMult(code),
-		Zone = zone.Id,
+		Zone = zone.Key,
 		ReadyAt = 0,
 	})
 	if model then
-		zoneCounts[zone.Id] = (zoneCounts[zone.Id] or 0) + 1
+		zoneCounts[zone.Key] = (zoneCounts[zone.Key] or 0) + 1
 	end
 	return model
 end
@@ -157,8 +161,8 @@ end
 
 -- Rain drops use the zone pool of whatever ring they land in, and count
 -- toward that zone's cap so rain can't flood the map permanently.
-function ItemSpawnService.spawnRainDrop(rarityBoost: number): Model?
-	local spot = findSpot(GameConfig.Bank.Radius + 4, GameConfig.Zones[#GameConfig.Zones].OuterRadius)
+function ItemSpawnService.spawnRainDrop(world, rarityBoost: number): Model?
+	local spot = findSpot(world, GameConfig.Bank.Radius + 4, world.Zones[#world.Zones].OuterRadius)
 	if not spot then
 		return nil
 	end
@@ -168,7 +172,7 @@ function ItemSpawnService.spawnRainDrop(rarityBoost: number): Model?
 	end
 	local def = pickItem(zone.Tier)
 	local code = StackCodec.code(def.Id, rollRarity(rarityBoost))
-	return ItemSpawnService.spawnLoose(code, spot + Vector3.new(0, GameConfig.Events.ItemRain.DropHeight, 0), spot, nil, zone.Id)
+	return ItemSpawnService.spawnLoose(code, spot + Vector3.new(0, GameConfig.Events.ItemRain.DropHeight, 0), spot, nil, zone.Key)
 end
 
 -- Items whose root parts are within `radius` of `position`.
@@ -223,21 +227,25 @@ function ItemSpawnService.init()
 	overlapParams.FilterType = Enum.RaycastFilterType.Include
 	overlapParams.FilterDescendantsInstances = { itemsFolder }
 
-	-- Fill every zone at start so the world never looks empty.
-	for _, zone in GameConfig.Zones do
-		zoneCounts[zone.Id] = 0
-		for _ = 1, zone.MaxItems do
-			ItemSpawnService.spawnInZone(zone)
+	-- Fill every zone of every world at start so no world ever looks empty.
+	for _, world in WorldIndex.list do
+		for _, zone in world.Zones do
+			zoneCounts[zone.Key] = 0
+			for _ = 1, zone.MaxItems do
+				ItemSpawnService.spawnInZone(zone)
+			end
 		end
 	end
 
 	task.spawn(function()
 		while true do
 			task.wait(GameConfig.Spawning.RespawnInterval)
-			for _, zone in GameConfig.Zones do
-				for _ = 1, GameConfig.Spawning.RespawnBatch do
-					if (zoneCounts[zone.Id] or 0) < zone.MaxItems then
-						ItemSpawnService.spawnInZone(zone)
+			for _, world in WorldIndex.list do
+				for _, zone in world.Zones do
+					for _ = 1, GameConfig.Spawning.RespawnBatch do
+						if (zoneCounts[zone.Key] or 0) < zone.MaxItems then
+							ItemSpawnService.spawnInZone(zone)
+						end
 					end
 				end
 			end
