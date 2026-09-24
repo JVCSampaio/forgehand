@@ -1,0 +1,241 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Stackhead preview</title>
+<link rel="stylesheet" href="fonts.css">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #8fc3f0; font-family: 'Fredoka One', 'Noto Color Emoji', sans-serif; }
+  canvas { display: block; }
+  #hud { position: absolute; inset: 0; pointer-events: none; display: none; color: #fff; }
+  .stroke { -webkit-text-stroke: 1.6px #0c0c18; paint-order: stroke fill; }
+  .panel { background: rgba(28, 30, 48, 0.9); border: 3px solid #0c0c18; box-sizing: border-box; }
+  #coins { position: absolute; left: 50%; top: 42px; transform: translateX(-50%); width: 230px; height: 52px; border-radius: 26px; display: flex; align-items: center; gap: 8px; padding-left: 10px; }
+  #coins .icon { font-size: 34px; } #coins .v { font-size: 34px; color: #ffcd3c; }
+  #wobble { position: absolute; left: 50%; top: 100px; transform: translateX(-50%); width: 340px; height: 22px; border-radius: 11px; overflow: hidden; }
+  #wobble .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 38%; background: #50d26e; border-radius: 11px; }
+  #wobble .t { position: absolute; inset: 0; text-align: center; font-size: 17px; line-height: 17px; }
+  #collection { position: absolute; right: 12px; top: 46px; font: bold 18px sans-serif; color: #bec3dc; }
+  #stack { position: absolute; right: 12px; top: 76px; width: 170px; height: 108px; border-radius: 16px; padding: 8px; }
+  #stack .n { font-size: 38px; } #stack .d { font: bold 17px/22px 'DejaVu Sans', sans-serif; color: #ffcd3c; }
+  #menu { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; }
+  .btn { width: 68px; height: 68px; border-radius: 14px; border: 3px solid #0c0c18; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 15px; line-height: 20px; box-sizing: border-box; position: relative; }
+  .badge { position: absolute; right: -8px; top: -8px; width: 24px; height: 24px; border-radius: 12px; background: #f05050; font-size: 17px; line-height: 24px; }
+  #dash, #glue { position: absolute; bottom: 18px; width: 80px; height: 80px; font-size: 17px; }
+  #dash { right: 18px; background: #4696ff; } #glue { right: 108px; background: #4696ff; }
+  #objective { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); font-size: 26px; color: #ffcd3c; white-space: nowrap; }
+  #topbar { position: absolute; left: 0; right: 0; top: 0; height: 36px; background: linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0)); }
+  #topbar .rb { position: absolute; top: 4px; width: 32px; height: 32px; border-radius: 8px; background: rgba(0,0,0,0.45); }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="topbar"><div class="rb" style="left:12px"></div><div class="rb" style="left:52px"></div></div>
+  <div id="coins" class="panel"><span class="icon">🪙</span><span class="v stroke">1,284</span></div>
+  <div id="wobble" class="panel"><div class="fill"></div><div class="t stroke">STEADY</div></div>
+  <div id="collection" class="stroke">📖 9/60</div>
+  <div id="stack" class="panel"><div class="n stroke">📦 28</div><div class="d stroke">Bank: 🪙92<br>Bonus x2.4</div></div>
+  <div id="menu">
+    <div class="btn stroke" style="background:#50d26e">⬆️<br>UPGRADE<div class="badge">!</div></div>
+    <div class="btn stroke" style="background:#aa64ff">🛒<br>SHOP</div>
+    <div class="btn stroke" style="background:#ffcd3c">🎁<br>DAILY<div class="badge">!</div></div>
+  </div>
+  <div id="glue" class="btn stroke">🧴 2<br>[G]</div>
+  <div id="dash" class="btn stroke">💨 DASH<br>[Q]</div>
+  <div id="objective" class="stroke">Bonus x2.4 — go taller or bank it before it falls!</div>
+</div>
+<script type="module">
+import * as THREE from './three.module.min.js';
+
+const VIEWS = {
+  overview: { pos: [250, 230, 330], look: [0, 0, 30], fov: 45, shadow: 330 },
+  gameplay: { pos: [0, 17, 72], look: [0, 12, 20], fov: 70, shadow: 90, hud: true },
+  tower: { pos: [-70, 34, 150], look: [-24, 42, 100], fov: 55, shadow: 90 },
+  bank: { pos: [44, 26, 66], look: [0, 7, 4], fov: 55, shadow: 90 },
+  collapse: { pos: [58, 18, 58], look: [34, 3, 30], fov: 50, shadow: 60 },
+};
+const viewName = new URLSearchParams(location.search).get('view') || 'overview';
+const view = VIEWS[viewName];
+if (view.hud) document.getElementById('hud').style.display = 'block';
+
+const scene = await (await fetch('scene.json')).json();
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.appendChild(renderer.domElement);
+
+const world = new THREE.Scene();
+// Sky gradient + light haze, approximating Lighting.Atmosphere.
+const skyCanvas = document.createElement('canvas'); skyCanvas.width = 2; skyCanvas.height = 256;
+const sg = skyCanvas.getContext('2d'); const grad = sg.createLinearGradient(0, 0, 0, 256);
+grad.addColorStop(0, '#3f8fe0'); grad.addColorStop(0.55, '#8cc4f2'); grad.addColorStop(1, '#dbeaf7');
+sg.fillStyle = grad; sg.fillRect(0, 0, 2, 256);
+const skyTex = new THREE.CanvasTexture(skyCanvas); skyTex.colorSpace = THREE.SRGBColorSpace;
+world.background = skyTex;
+world.fog = new THREE.Fog(0xcfe3f5, 260, 1100);
+
+world.add(new THREE.HemisphereLight(0xdfeeff, 0x8a7a66, 1.25));
+const sun = new THREE.DirectionalLight(0xfff2dd, 2.4);
+const target = new THREE.Vector3(...view.look);
+sun.position.copy(target).add(new THREE.Vector3(-160, 260, 120));
+sun.target.position.copy(target);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+const sc = sun.shadow.camera; sc.left = -view.shadow; sc.right = view.shadow; sc.top = view.shadow; sc.bottom = -view.shadow; sc.near = 1; sc.far = 900;
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.05;
+world.add(sun, sun.target);
+
+// Roblox WedgePart: full height at the back (+Z) face, slope down to the front (-Z).
+function wedgeGeometry() {
+  const v = [
+    [-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, -0.5, 0.5], [-0.5, -0.5, 0.5],
+    [-0.5, 0.5, 0.5], [0.5, 0.5, 0.5],
+  ];
+  const faces = [[0, 2, 1], [0, 3, 2], [3, 5, 2], [3, 4, 5], [0, 4, 3], [1, 2, 5], [0, 1, 5], [0, 5, 4]];
+  const pos = [];
+  for (const f of faces) for (const i of f) pos.push(...v[i]);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
+const GEOM = {
+  Block: new THREE.BoxGeometry(1, 1, 1),
+  Ball: new THREE.SphereGeometry(0.5, 32, 20),
+  Cylinder: new THREE.CylinderGeometry(0.5, 0.5, 1, 36).rotateZ(Math.PI / 2),
+  Wedge: wedgeGeometry(),
+};
+
+const matCache = new Map();
+function material(p) {
+  const key = `${p.k}|${p.mat}|${p.t}|${p.r}`;
+  if (matCache.has(key)) return matCache.get(key);
+  const color = new THREE.Color().setRGB(p.k[0] / 255, p.k[1] / 255, p.k[2] / 255, THREE.SRGBColorSpace);
+  const opts = { color, roughness: 0.62, metalness: 0.0 };
+  switch (p.mat) {
+    case 'Neon': Object.assign(opts, { emissive: color, emissiveIntensity: 1.6 }); break;
+    case 'Metal': Object.assign(opts, { roughness: 0.35, metalness: 0.55 }); break;
+    case 'CorrodedMetal': Object.assign(opts, { roughness: 0.8, metalness: 0.3 }); break;
+    case 'Foil': Object.assign(opts, { roughness: 0.22, metalness: 0.85, emissive: color, emissiveIntensity: 0.18 }); break;
+    case 'Glass': Object.assign(opts, { roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.72 }); break;
+    case 'Wood': case 'WoodPlanks': case 'Fabric': Object.assign(opts, { roughness: 0.9 }); break;
+  }
+  if (p.t > 0) Object.assign(opts, { transparent: true, opacity: Math.min(opts.opacity ?? 1, 1 - p.t) });
+  if (p.r > 0) opts.metalness = Math.max(opts.metalness, p.r);
+  const m = new THREE.MeshStandardMaterial(opts);
+  matCache.set(key, m);
+  return m;
+}
+
+const meshes = [];
+for (const p of scene.parts) {
+  const shape = p.c === 'WedgePart' ? 'Wedge' : (GEOM[p.s] ? p.s : 'Block');
+  const mesh = new THREE.Mesh(GEOM[shape], material(p));
+  const [x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22] = p.m;
+  const sx = p.z[0], sy = p.z[1], sz = p.z[2];
+  let scale;
+  if (shape === 'Ball') { const d = Math.min(sx, sy, sz); scale = [d, d, d]; }
+  else if (shape === 'Cylinder') { const d = Math.min(sy, sz); scale = [sx, d, d]; }
+  else scale = [sx, sy, sz];
+  const m4 = new THREE.Matrix4().set(r00, r01, r02, x, r10, r11, r12, y, r20, r21, r22, z, 0, 0, 0, 1);
+  m4.multiply(new THREE.Matrix4().makeScale(...scale));
+  mesh.matrixAutoUpdate = false;
+  mesh.matrix.copy(m4);
+  const big = sx > 300 || sz > 300;
+  mesh.castShadow = !big && p.t < 0.5;
+  mesh.receiveShadow = true;
+  world.add(mesh);
+  meshes.push(mesh);
+  if (p.sparkle) {
+    const glow = new THREE.PointLight(p.mat === 'Foil' ? 0xffc828 : 0xaae6ff, 6, 8);
+    glow.position.set(x, y + 0.5, z);
+    world.add(glow);
+  }
+}
+
+function textCanvas(lines, w, h, color, bg) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  if (bg) { g.fillStyle = bg; g.fillRect(0, 0, w, h); }
+  const rows = lines.join('\n').split('\n');
+  const size = Math.min(h / rows.length * 0.78, w / Math.max(...rows.map(r => r.length)) * 1.6);
+  g.font = `${size}px 'Fredoka One', 'Noto Color Emoji'`;
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineWidth = size * 0.14; g.strokeStyle = '#1e1e28'; g.fillStyle = color;
+  rows.forEach((r, i) => {
+    const yy = h / 2 + (i - (rows.length - 1) / 2) * size * 1.05;
+    g.strokeText(r, w / 2, yy); g.fillText(r, w / 2, yy);
+  });
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  return t;
+}
+
+// SurfaceGui text on signs / leaderboard, BillboardGui on the bank coin.
+drawTexts(scene.texts);
+function drawTexts(list) {
+for (const t of list) {
+  const p = scene.parts[t.part - 1];
+  const [x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22] = p.m;
+  const basis = new THREE.Matrix4().set(r00, r01, r02, x, r10, r11, r12, y, r20, r21, r22, z, 0, 0, 0, 1);
+  if (t.kind === 'BillboardGui') {
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: textCanvas(t.lines, 512, 180, '#ffdc50'), depthTest: true }));
+    sprite.position.set(x, y + 8, z); sprite.scale.set(16, 5.6, 1);
+    world.add(sprite);
+    continue;
+  }
+  let lines = t.lines;
+  const isBoard = lines.includes('TALLEST STACKS');
+  if (isBoard) lines = ['TALLEST STACKS', '1.  StackQueen — 212', '2.  noob_master — 187', '3.  PizzaTower — 164', '4.  Wobbles — 121', '5.  you — 85'];
+  const w = p.z[0], h = p.z[1];
+  const tex = textCanvas(isBoard ? [lines[0]] : lines, 1024, Math.round(1024 * h / w), isBoard ? '#ffd750' : '#ffffff');
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+  const flip = t.face === 'Front' ? Math.PI : 0;
+  const offset = new THREE.Matrix4().makeTranslation(0, 0, (t.face === 'Front' ? -1 : 1) * (p.z[2] / 2 + 0.02));
+  plane.matrixAutoUpdate = false;
+  plane.matrix.copy(basis).multiply(offset).multiply(new THREE.Matrix4().makeRotationY(flip));
+  if (isBoard) {
+    // Render rows on a taller canvas for legibility.
+    const c = document.createElement('canvas'); c.width = 700; c.height = 800;
+    const g = c.getContext('2d');
+    g.textBaseline = 'middle'; g.lineWidth = 6; g.strokeStyle = '#1e1e28';
+    g.font = "64px 'Fredoka One'"; g.fillStyle = '#ffd750'; g.textAlign = 'center';
+    g.strokeText(lines[0], 350, 70); g.fillText(lines[0], 350, 70);
+    g.font = "44px 'Fredoka One'"; g.fillStyle = '#ffffff'; g.textAlign = 'left';
+    lines.slice(1).forEach((r, i) => { g.strokeText(r, 30, 180 + i * 78); g.fillText(r, 30, 180 + i * 78); });
+    const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace;
+    plane.material.map = tx;
+  }
+  world.add(plane);
+}
+}
+
+// LeaderboardService fills the board at runtime (not run by the exporter):
+// draw sample rows on both faces.
+scene.parts.forEach((p, i) => {
+  if (p.n === 'Leaderboard') {
+    scene.texts.push({ kind: 'SurfaceGui', face: 'Front', part: i + 1, lines: ['TALLEST STACKS'] });
+    scene.texts.push({ kind: 'SurfaceGui', face: 'Back', part: i + 1, lines: ['TALLEST STACKS'] });
+  }
+});
+drawTexts(scene.texts.filter(t => t.lines.includes('TALLEST STACKS')));
+
+// Client-rendered stack counters (BillboardGui in game).
+for (const l of scene.labels) {
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: textCanvas([l.text], 256, 110, l.color), depthTest: false }));
+  sprite.position.set(l.x, l.y, l.z); sprite.scale.set(5, 2.15, 1); sprite.renderOrder = 10;
+  world.add(sprite);
+}
+
+const camera = new THREE.PerspectiveCamera(view.fov, innerWidth / innerHeight, 0.3, 3000);
+camera.position.set(...view.pos);
+camera.lookAt(target);
+renderer.render(world, camera);
+document.title = 'ready';
+</script>
+</body>
+</html>

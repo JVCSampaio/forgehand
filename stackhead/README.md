@@ -48,6 +48,22 @@ luau-lsp analyze --platform roblox --sourcemap sourcemap.json \
   --definitions=@roblox=globalTypes.d.luau src
 ```
 
+## Preview without Studio
+
+`tools/preview/` runs the real world generators (`WorldService`,
+`ItemSpawnService`, `ItemBuilder`) from the built place inside Lune's Roblox
+DOM, exports every part, and renders it with Three.js in headless Chromium.
+Staged players/stacks and the HUD overlay are mock-ups for the screenshot;
+lighting and materials are approximations of Roblox's renderer.
+
+```bash
+lune run tools/preview/export_scene.luau build/Stackhead.rbxl build/preview/scene.json
+cp tools/preview/preview.html build/preview/index.html
+# also copy three.module.min.js and fonts into build/preview, then:
+(cd build/preview && python3 -m http.server 8123) &
+node tools/preview/shoot.mjs http://localhost:8123 build/preview/shots
+```
+
 ## Layout
 
 ```

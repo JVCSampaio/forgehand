@@ -32,36 +32,39 @@ end
 
 local function buildBoard()
 	local board = Workspace:WaitForChild("Map"):WaitForChild("Leaderboard")
-	local gui = Instance.new("SurfaceGui")
-	gui.Face = Enum.NormalId.Front
-	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = 30
-	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 6)
-	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	layout.Parent = gui
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, 0, 0, 70)
-	title.BackgroundTransparency = 1
-	title.Text = "TALLEST STACKS"
-	title.Font = Enum.Font.FredokaOne
-	title.TextScaled = true
-	title.TextColor3 = Color3.fromRGB(255, 215, 80)
-	title.Parent = gui
-	for i = 1, CFG.Entries do
-		local row = Instance.new("TextLabel")
-		row.Size = UDim2.new(0.92, 0, 0, 34)
-		row.BackgroundTransparency = 1
-		row.Font = Enum.Font.GothamBold
-		row.TextScaled = true
-		row.TextXAlignment = Enum.TextXAlignment.Left
-		row.TextColor3 = Color3.new(1, 1, 1)
-		row.Text = string.format("%d.  —", i)
-		row.LayoutOrder = i
-		row.Parent = gui
-		rows[i] = row
+	-- Both faces, so the board reads from the bank and from the spawns.
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = face
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 30
+		local layout = Instance.new("UIListLayout")
+		layout.Padding = UDim.new(0, 6)
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		layout.Parent = gui
+		local title = Instance.new("TextLabel")
+		title.Size = UDim2.new(1, 0, 0, 70)
+		title.BackgroundTransparency = 1
+		title.Text = "TALLEST STACKS"
+		title.Font = Enum.Font.FredokaOne
+		title.TextScaled = true
+		title.TextColor3 = Color3.fromRGB(255, 215, 80)
+		title.Parent = gui
+		for i = 1, CFG.Entries do
+			local row = Instance.new("TextLabel")
+			row.Size = UDim2.new(0.92, 0, 0, 34)
+			row.BackgroundTransparency = 1
+			row.Font = Enum.Font.GothamBold
+			row.TextScaled = true
+			row.TextXAlignment = Enum.TextXAlignment.Left
+			row.TextColor3 = Color3.new(1, 1, 1)
+			row.Text = string.format("%d.  —", i)
+			row.LayoutOrder = i
+			row.Parent = gui
+			table.insert(rows, row)
+		end
+		gui.Parent = board
 	end
-	gui.Parent = board
 end
 
 local function refresh()
@@ -86,9 +89,14 @@ local function refresh()
 		return
 	end
 	for i, entry in pages:GetCurrentPage() do
-		if rows[i] then
-			local userId = tonumber(entry.key)
-			rows[i].Text = string.format("%d.  %s — %d", i, if userId then nameFor(userId) else "?", entry.value)
+		local userId = tonumber(entry.key)
+		local text = string.format("%d.  %s — %d", i, if userId then nameFor(userId) else "?", entry.value)
+		-- rows holds one label per entry per face.
+		for face = 0, 1 do
+			local row = rows[face * CFG.Entries + i]
+			if row then
+				row.Text = text
+			end
 		end
 	end
 end

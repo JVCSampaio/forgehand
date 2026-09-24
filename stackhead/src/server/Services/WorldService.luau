@@ -56,6 +56,23 @@ local function disc(radius: number, topY: number, color: Color3, material: Enum.
 	})
 end
 
+-- Ring floors are stacked discs, outer ones lowest. 0.1 studs apart so they
+-- never z-fight, even from far away.
+function WorldService.ringTop(index: number): number
+	return GameConfig.World.GroundY + 0.1 * (#GameConfig.Zones - index + 1)
+end
+
+-- Height of the walkable floor at a world position.
+function WorldService.groundTopAt(position: Vector3): number
+	local r = Vector2.new(position.X, position.Z).Magnitude
+	for index, zone in GameConfig.Zones do
+		if r < zone.OuterRadius then
+			return WorldService.ringTop(index)
+		end
+	end
+	return GameConfig.World.GroundY
+end
+
 local function addObstacle(position: Vector3, radius: number)
 	table.insert(WorldService.Obstacles, { Position = position, Radius = radius })
 end
@@ -131,7 +148,8 @@ local function stall(position: Vector3)
 	for _, x in { -3.7, 3.7 } do
 		part({ Name = "Post", Size = Vector3.new(0.5, 7, 0.5), CFrame = cf * CFrame.new(x, 3.5, 1.2), Color = Color3.fromRGB(240, 240, 240) })
 	end
-	wedge({ Name = "Awning", Size = Vector3.new(9, 1.5, 4), CFrame = cf * CFrame.new(0, 7.5, 0.3) * CFrame.Angles(0, math.rad(180), 0), Color = awning })
+	-- WedgeParts are tallest at their back (+Z) face, so this slopes down toward the front.
+	wedge({ Name = "Awning", Size = Vector3.new(9, 1.5, 4), CFrame = cf * CFrame.new(0, 7.5, 0.3), Color = awning })
 	addObstacle(position, 5)
 end
 
@@ -140,8 +158,8 @@ local function house(position: Vector3)
 	local wall = Color3.fromHSV(rng:NextNumber(), 0.25, 0.95)
 	local roof = Color3.fromHSV(rng:NextNumber(), 0.55, 0.65)
 	part({ Name = "House", Size = Vector3.new(12, 9, 10), CFrame = cf * CFrame.new(0, 4.5, 0), Color = wall })
-	wedge({ Name = "Roof", Size = Vector3.new(13, 4, 5.5), CFrame = cf * CFrame.new(0, 11, -2.75) * CFrame.Angles(0, math.rad(180), 0), Color = roof })
-	wedge({ Name = "Roof", Size = Vector3.new(13, 4, 5.5), CFrame = cf * CFrame.new(0, 11, 2.75), Color = roof })
+	wedge({ Name = "Roof", Size = Vector3.new(13, 4, 5.5), CFrame = cf * CFrame.new(0, 11, 2.75) * CFrame.Angles(0, math.rad(180), 0), Color = roof })
+	wedge({ Name = "Roof", Size = Vector3.new(13, 4, 5.5), CFrame = cf * CFrame.new(0, 11, -2.75), Color = roof })
 	part({ Name = "Door", Size = Vector3.new(2.5, 5, 0.3), CFrame = cf * CFrame.new(0, 2.5, -5.1), Color = Color3.fromRGB(120, 80, 50) })
 	addObstacle(position, 8)
 end
@@ -160,8 +178,8 @@ local function barn(position: Vector3)
 	local cf = facingCenter(position)
 	local red = Color3.fromRGB(190, 45, 40)
 	part({ Name = "Barn", Size = Vector3.new(22, 14, 18), CFrame = cf * CFrame.new(0, 7, 0), Color = red })
-	wedge({ Name = "Roof", Size = Vector3.new(23, 7, 9.5), CFrame = cf * CFrame.new(0, 17.5, -4.75) * CFrame.Angles(0, math.rad(180), 0), Color = Color3.fromRGB(70, 60, 60) })
-	wedge({ Name = "Roof", Size = Vector3.new(23, 7, 9.5), CFrame = cf * CFrame.new(0, 17.5, 4.75), Color = Color3.fromRGB(70, 60, 60) })
+	wedge({ Name = "Roof", Size = Vector3.new(23, 7, 9.5), CFrame = cf * CFrame.new(0, 17.5, 4.75) * CFrame.Angles(0, math.rad(180), 0), Color = Color3.fromRGB(70, 60, 60) })
+	wedge({ Name = "Roof", Size = Vector3.new(23, 7, 9.5), CFrame = cf * CFrame.new(0, 17.5, -4.75), Color = Color3.fromRGB(70, 60, 60) })
 	part({ Name = "BarnDoor", Size = Vector3.new(8, 10, 0.4), CFrame = cf * CFrame.new(0, 5, -9.1), Color = Color3.fromRGB(245, 240, 230) })
 	addObstacle(position, 15)
 end
@@ -211,7 +229,7 @@ local function buildBank()
 	local center = bank.Position
 	disc(bank.Radius, 0.6, Color3.fromRGB(255, 214, 90), Enum.Material.SmoothPlastic, "BankFloor")
 	disc(bank.Radius - 1.5, 0.65, Color3.fromRGB(255, 236, 170), Enum.Material.SmoothPlastic, "BankInner")
-	local ring = disc(bank.Radius + 0.6, 0.35, Color3.fromRGB(255, 170, 40), Enum.Material.Neon, "BankRing")
+	local ring = disc(bank.Radius + 0.6, 0.5, Color3.fromRGB(255, 170, 40), Enum.Material.Neon, "BankRing")
 	ring.CanCollide = false
 
 	part({
@@ -219,7 +237,7 @@ local function buildBank()
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(14, 4, 4),
 		CFrame = CFrame.new(center + Vector3.new(0, 7.6, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = Color3.fromRGB(60, 60, 80),
+		Color = Color3.fromRGB(255, 236, 170),
 	})
 	local coin = part({
 		Name = "BankCoin",
@@ -264,7 +282,8 @@ local function buildBank()
 		spawn.Neutral = true
 		spawn.Duration = 0
 		spawn.Size = Vector3.new(6, 0.4, 6)
-		spawn.CFrame = CFrame.lookAt(position + Vector3.new(0, 0.2, 0), position * 2 + Vector3.new(0, 0.2, 0))
+		local y = WorldService.groundTopAt(position) + 0.2
+		spawn.CFrame = CFrame.lookAt(position + Vector3.new(0, y, 0), position * 2 + Vector3.new(0, y, 0))
 		spawn.Color = Color3.fromRGB(255, 255, 255)
 		spawn.Material = Enum.Material.SmoothPlastic
 		spawn.Transparency = 0.3
@@ -286,11 +305,11 @@ local function buildLeaderboardBoard()
 		Name = "Leaderboard",
 		Size = Vector3.new(14, 16, 0.6),
 		CFrame = CFrame.lookAt(position + Vector3.new(0, 9, 0), Vector3.new(bank.Position.X, 9, bank.Position.Z)),
-		Color = Color3.fromRGB(40, 40, 60),
+		Color = Color3.fromRGB(52, 64, 110),
 	})
 	for _, x in { -6, 6 } do
 		local legPosition = (CFrame.lookAt(position, bank.Position) * CFrame.new(x, 0.5, 0)).Position
-		part({ Name = "LeaderboardLeg", Size = Vector3.new(0.8, 2, 0.8), CFrame = CFrame.new(legPosition), Color = Color3.fromRGB(40, 40, 60) })
+		part({ Name = "LeaderboardLeg", Size = Vector3.new(0.8, 2, 0.8), CFrame = CFrame.new(legPosition), Color = Color3.fromRGB(52, 64, 110) })
 	end
 	addObstacle(position, 8)
 end
@@ -324,15 +343,21 @@ end
 
 local function buildZones()
 	local zones = GameConfig.Zones
-	-- Outer rings first; each inner disc sits slightly higher to avoid z-fighting.
 	for index = #zones, 1, -1 do
 		local zone = zones[index]
 		local material = if zone.Id == "Docks" then Enum.Material.WoodPlanks else Enum.Material.SmoothPlastic
-		disc(zone.OuterRadius, 0.05 + (#zones - index) * 0.02, zone.GroundColor, material, zone.Id .. "Ground")
+		disc(zone.OuterRadius, WorldService.ringTop(index), zone.GroundColor, material, zone.Id .. "Ground")
 	end
-	-- Low kerb between rings so zone borders read clearly.
+	-- White kerb between rings: sits on the outer ring, just under the inner one,
+	-- so a thin line shows at every zone border.
 	for index = 2, #zones do
-		local border = disc(zones[index].InnerRadius + 0.5, 0.02, Color3.fromRGB(245, 245, 240), Enum.Material.SmoothPlastic, "Border")
+		local border = disc(
+			zones[index].InnerRadius + 0.7,
+			WorldService.ringTop(index) + 0.05,
+			Color3.fromRGB(250, 250, 245),
+			Enum.Material.SmoothPlastic,
+			"Border"
+		)
 		border.CanCollide = false
 	end
 

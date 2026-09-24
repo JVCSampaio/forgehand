@@ -23,7 +23,9 @@ scattering the items as free loot. Design: `docs/DESIGN.md`. Economy: `docs/ECON
 ## Verified
 
 Clean luau-lsp typecheck with Roblox definitions, unit tests, pacing sim, `rojo build`
-and place verification. **Not yet run inside Roblox Studio** (no Studio in the build environment).
+and place verification. World/item generators executed in Lune's Roblox DOM and
+rendered with `tools/preview` (fixed inverted wedge roofs, ring-floor z-fighting,
+hidden zone borders, items sunk into raised floors). **Not yet run inside Roblox Studio.**
 
 ## Current task
 

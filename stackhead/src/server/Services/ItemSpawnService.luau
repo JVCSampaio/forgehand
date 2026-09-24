@@ -96,7 +96,8 @@ local function place(code: string, groundPosition: Vector3, info: ItemInfo, attr
 	end
 	local def = info.Def
 	local yaw = CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
-	ItemBuilder.pivot(model, CFrame.new(groundPosition + Vector3.new(0, def.Height / 2 + 0.2, 0)) * yaw)
+	local floor = WorldService.groundTopAt(groundPosition)
+	ItemBuilder.pivot(model, CFrame.new(groundPosition.X, floor + def.Height / 2 + 0.05, groundPosition.Z) * yaw)
 	local root = model.PrimaryPart :: BasePart
 	-- Only the root is queryable so each item is one overlap hit.
 	root.CanQuery = true
