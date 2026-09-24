@@ -113,21 +113,41 @@ Pequenos sistemas emergentes que saem daí sem conteúdo extra:
 - **Itens altos valem mais, mas desestabilizam**: carregar 3 carros é uma decisão.
 - **Zona mais valiosa = mais longe do banco = mais tempo exposto.**
 
+## 6b. Os quatro mundos
+
+Cada mundo é uma ilha redonda com banco no centro e 4 anéis. A camada de
+progressão de longo prazo é esta: cada 4 níveis de Strength abre um mundo novo,
+com itens ~40× mais valiosos e visual próprio.
+
+| Mundo | Clima | Anéis (tiers) | Marcos visuais |
+|---|---|---|---|
+| 🏘️ **Stackville** | tarde ensolarada | Market Street · Yard Sale · Old Farm · The Docks (1–4) | ruas de mercado com barracas listradas e chafarizes, subúrbio com cercas e "yard sales", plantações, celeiro, moinho, trator, porto com contêineres, guindastes, píeres, barcos, farol |
+| 🏔️ **Frostpeak** | manhã fria com neve caindo | Snowy Village · Ski Lodge · Ice Caves · The Summit (5–8) | cabanas de madeira com neve, pistas de patinação, lodge A-frame, teleférico, cristais de gelo, arcos de gelo, acampamento, observatório, montanhas nevadas no horizonte |
+| 🍭 **Candy Coast** | tarde rosada | Sweet Street · Bakery Row · Sugar Beach · Candy Pier (9–12) | lojas de doce com cobertura, casas-cupcake, donuts gigantes, pirulitos, postes de bengala, palmeiras, guarda-sóis, roda-gigante, carrossel |
+| 🌃 **Neon City** | anoitecer roxo | Arcade Street · Tech Mall · Robot Factory · Skyline (13–16) | fliperamas com letreiros neon, torres de vidro, fábrica com chaminés e braços robóticos, carros voadores, um anel de arranha-céus em volta da ilha |
+
+O mapa é 100% gerado por código (`src/server/World`): um **Kit** (pisos, ruas
+radiais, banco, placas, água, mapa de obstáculos) + **Props** reutilizáveis + um
+tema por mundo. Um mundo novo custa um arquivo de tema e uma entrada em
+`WorldConfig`.
+
 ## 7. Retenção
 
 | Escala | O que puxa |
 |---|---|
 | **Micro (segundos)** | cada item: som com pitch subindo, número na cabeça, multiplicador |
 | **Sessão (5–30 min)** | upgrades; Strength 2 desbloqueia a 2ª zona (~2 min bot / ~5 min humano); Strength 3 (~9 / ~20 min) |
-| **Meta (horas/dias)** | Strength 4 / Docks (~35 min bot, meta de 2ª sessão); Balance tem 20 níveis caros; coleção de 60 descobertas (20 itens × normal/shiny/golden) |
-| **Aspiracional (semanas)** | recordes de pilha com títulos (10 → 500), leaderboard global "Tallest Stacks", itens golden (0,6%) |
+| **Meta (horas/dias)** | 4 mundos (Frostpeak ~2 h, Candy Coast ~5 h, Neon City ~9 h para um humano); **3 pedidos diários**; Balance com 40 níveis; coleção de 204 descobertas (68 itens × normal/shiny/golden) |
+| **Aspiracional (semanas)** | recordes com títulos (10 → 999), 12 **bases de pilha** visíveis para todos (ganhas por recorde, mundo, sequência ou Robux), leaderboard global, itens golden (0,6%) |
 
-**Por que voltar amanhã:** sequência de login de 7 dias (moedas escaladas
-pela tier + glue grátis), um recorde que ficou *quase* lá, a zona seguinte
-que custa um pouco mais do que deu para juntar, e a coleção incompleta.
+**Por que voltar amanhã:** três pedidos novos por dia (painel TASKS), sequência
+de login de 7 dias (com uma base exclusiva no dia 7), um recorde que ficou *quase*
+lá, o próximo mundo que ainda não abriu, e a coleção incompleta.
 Nenhum timer do tipo "espere 8 h ou pague".
 
 ## 8. Monetização
+
+Estratégia completa em [`MONETIZATION.md`](MONETIZATION.md). Resumo abaixo.
 
 Princípio: **o jogador gratuito joga tudo.** Robux compra conveniência,
 aceleração, cosméticos e momentos sociais. Nada de loot box paga, pop-up
@@ -200,6 +220,12 @@ vidro brilhante, golden = folha dourada + partículas). Nada de realismo.
 
 ## 14. Thumbnail / ícone
 
+Arte pronta em [`../marketing/`](../marketing/), renderizada a partir do mapa e dos
+itens reais (`tools/art/run.sh`): `thumbnail-tower.png` (a fantasia),
+`thumbnail-crash.png` (o risco), `thumbnail-worlds.png` (o conteúdo) e `icon-512.png`.
+Use as três thumbnails em rotação/A-B.
+
+
 - **Ícone:** close do avatar olhando pra cima, com uma torre de itens coloridos saindo do quadro; um porco dourado no meio.
 - **Thumbnail 1:** avatar pequeno no chão ↔ torre enorme (seta "1 → 200"), pilha curvada, moedas explodindo.
 - **Thumbnail 2 (A/B):** a torre desabando sobre outros jogadores, "💥 CRASH!".
@@ -253,8 +279,8 @@ Placeholders usam sons embutidos do engine (`rbxasset://sounds/...`); trocar por
 | **Dia 1** | hotfix: erros de console, gargalos de FTUE, ajuste de `Wobble` | funil `Stack5→FirstBank`, `Collapse` |
 | **Semana 1** | 6 itens novos (1 por tier + 2 raros); códigos de resgate | tempo de sessão |
 | **Semana 2** | **experimento**: `HeightBonus.PerItem` 0,05 vs 0,06; preço do Glue 25 vs 15 | receita/DAU, retenção D1 |
-| **Semana 3** | zona 5 ("Downtown": geladeiras, motos, cofres) + Strength 5 | quantos chegam em Docks |
-| **Semana 4** | "Stack Party" (evento de fim de semana 2× Item Rain), cosméticos de base de pilha, prestígio ("Deliver the tower") se o late game estiver vazio | D7, sessões/usuário |
+| **Semana 3** | evento de fim de semana (Golden Hour grátis por 1 h) + bases temáticas | quantos chegam em Frostpeak |
+| **Semana 4** | **Stack Pass** (temporada de 30 dias ligada aos pedidos), efeitos de desabamento; 5º mundo se Neon City estiver cheio | D7, sessões/usuário, receita/DAU |
 
 Sistemas ruins saem mesmo que estejam no roadmap.
 

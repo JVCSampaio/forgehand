@@ -43,7 +43,19 @@ function ItemSpawnService.rarityMult(code: string): number
 	return raritySuffixMult[suffix] or 1
 end
 
+-- Server-wide rarity multiplier (Golden Hour).
+local globalBoost = 1
+local globalBoostUntil = 0
+
+function ItemSpawnService.setGlobalBoost(multiplier: number, untilTime: number)
+	globalBoost = multiplier
+	globalBoostUntil = untilTime
+end
+
 local function rollRarity(boost: number): string
+	if os.clock() < globalBoostUntil then
+		boost *= globalBoost
+	end
 	for _, rarity in GameConfig.Spawning.Rarities do
 		if rng:NextNumber() < rarity.Chance * boost then
 			return rarity.Suffix

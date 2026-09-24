@@ -51,7 +51,7 @@ function Schema.defaults(economyConfig, upgradeConfig)
 		Settings = { Music = true, Sfx = true },
 		-- v2
 		LastWorld = "",
-		Orders = { Day = 0, Progress = { 0, 0, 0 }, Claimed = { false, false, false } },
+		Orders = { Day = 0, List = {}, Progress = { 0, 0, 0 }, Claimed = { false, false, false } },
 		Cosmetics = { Owned = {}, Equipped = "" },
 		Flags = { StarterPack = false },
 	}
@@ -144,9 +144,28 @@ function Schema.sanitize(data, economyConfig, upgradeConfig)
 
 	if type(data.Orders) == "table" then
 		out.Orders.Day = math.floor(finiteNumber(data.Orders.Day, 0, 0, 1e7))
+		if type(data.Orders.List) == "table" then
+			for i = 1, 3 do
+				local order = data.Orders.List[i]
+				if type(order) == "table" and type(order.Kind) == "string" and #order.Kind <= 16 then
+					out.Orders.List[i] = {
+						Kind = order.Kind,
+						Target = math.floor(finiteNumber(order.Target, 1, 1, 1e15)),
+						ItemId = if type(order.ItemId) == "string" and #order.ItemId <= 8 then order.ItemId else nil,
+						RewardCoins = math.floor(finiteNumber(order.RewardCoins, 0, 0, 1e15)),
+						RewardGlue = math.floor(finiteNumber(order.RewardGlue, 0, 0, 10)),
+					}
+				end
+			end
+			-- A partial list is useless; regenerate the day.
+			if #out.Orders.List ~= 3 then
+				out.Orders.List = {}
+				out.Orders.Day = 0
+			end
+		end
 		for i = 1, 3 do
 			if type(data.Orders.Progress) == "table" then
-				out.Orders.Progress[i] = math.floor(finiteNumber(data.Orders.Progress[i], 0, 0, 1e9))
+				out.Orders.Progress[i] = math.floor(finiteNumber(data.Orders.Progress[i], 0, 0, 1e15))
 			end
 			if type(data.Orders.Claimed) == "table" then
 				out.Orders.Claimed[i] = data.Orders.Claimed[i] == true

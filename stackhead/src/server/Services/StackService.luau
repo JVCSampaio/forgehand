@@ -73,7 +73,8 @@ local function newState(): PlayerState
 	}
 end
 
-function StackService.onBanked(callback: (Player, any, number) -> ())
+-- callback(player, profile, count, codes, coinsEarned)
+function StackService.onBanked(callback: (Player, any, number, { string }, number) -> ())
 	table.insert(bankedCallbacks, callback)
 end
 
@@ -151,6 +152,7 @@ local function bank(player: Player, state: PlayerState, profile)
 		player:SetAttribute("Title", Economy.titleFor(count, EconomyConfig))
 	end
 
+	local bankedCodes = table.clone(state.Codes)
 	table.clear(state.Codes)
 	table.clear(state.Entries)
 	state.Height = 0
@@ -181,7 +183,7 @@ local function bank(player: Player, state: PlayerState, profile)
 	Analytics.source(player, grand, profile.Coins, Enum.AnalyticsEconomyTransactionType.Gameplay.Name, "Bank")
 	Analytics.custom(player, "BankStack", count)
 	for _, callback in bankedCallbacks do
-		task.spawn(callback, player, profile, count)
+		task.spawn(callback, player, profile, count, bankedCodes, grand)
 	end
 	DataService.changed(player)
 end

@@ -308,6 +308,7 @@ for _, inst in Workspace:GetDescendants() do
 			r = round(inst.Reflectance),
 			mat = inst.Material.Name,
 			sparkle = inst:FindFirstChildOfClass("ParticleEmitter") ~= nil,
+			a = inst:IsDescendantOf(actors) or nil,
 		})
 		for _, gui in inst:GetChildren() do
 			if gui:IsA("SurfaceGui") or gui:IsA("BillboardGui") then
@@ -340,4 +341,10 @@ fs.writeFile(
 		ambient = { lighting.Ambient.R, lighting.Ambient.G, lighting.Ambient.B },
 	})
 )
+-- Item and base catalogues for the art renderer (tools/art).
+local CosmeticConfig = host.require(Shared.Config.CosmeticConfig)
+local serde = require("@lune/serde")
+local outDir = string.match(outPath, "^(.*)/[^/]+$") or "."
+fs.writeFile(outDir .. "/items.json", serde.encode("json", { Items = ItemConfig.Items, Bases = CosmeticConfig.Bases }))
+
 print(string.format("exported %d parts, %d gui surfaces, %d stack labels -> %s", #parts, #texts, #labels, outPath))

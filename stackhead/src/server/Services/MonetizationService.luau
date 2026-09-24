@@ -21,6 +21,7 @@ local passKeyById: { [number]: string } = {}
 local productKeyById: { [number]: string } = {}
 local passChangedCallbacks = {}
 local rainHandler: ((Player) -> ())? = nil
+local goldenHourHandler: ((Player, number) -> ())? = nil
 
 for key, pass in MonetizationConfig.GamePasses do
 	if pass.Id ~= 0 then
@@ -93,6 +94,10 @@ function MonetizationService.setRainHandler(handler: (Player) -> ())
 	rainHandler = handler
 end
 
+function MonetizationService.setGoldenHourHandler(handler: (Player, number) -> ())
+	goldenHourHandler = handler
+end
+
 local function firePassChanged(player: Player)
 	for _, callback in passChangedCallbacks do
 		task.spawn(callback, player)
@@ -116,10 +121,23 @@ end
 
 local function grant(player: Player, profile, product): boolean
 	local g = product.Grant
+	local repeatOneTime = product.OneTime and profile.Flags.StarterPack
+	if product.OneTime then
+		profile.Flags.StarterPack = true
+	end
+	if g.Cosmetic and not repeatOneTime then
+		profile.Cosmetics.Owned[g.Cosmetic] = true
+	end
+	if g.GoldenHour then
+		if not goldenHourHandler then
+			return false
+		end
+		goldenHourHandler(player, g.GoldenHour)
+	end
 	if g.Glue then
 		profile.Glue = math.min(EconomyConfig.MaxGlue, profile.Glue + g.Glue)
 	end
-	if g.BoostSeconds then
+	if g.BoostSeconds and not repeatOneTime then
 		profile.BoostEndsAt = math.max(os.time(), profile.BoostEndsAt) + g.BoostSeconds
 	end
 	if g.ScaledCoins then

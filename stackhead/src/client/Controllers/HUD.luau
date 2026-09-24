@@ -223,7 +223,7 @@ local function buildMenuButtons()
 		{ Id = "Upgrades", Text = "⬆️\nUPGRADE", Color = C.Green },
 		{ Id = "Worlds", Text = "🌍\nWORLDS", Color = C.Blue },
 		{ Id = "Shop", Text = "🛒\nSHOP", Color = C.Purple },
-		{ Id = "Daily", Text = "🎁\nDAILY", Color = C.Gold },
+		{ Id = "Tasks", Text = "📋\nTASKS", Color = C.Gold },
 	}
 	for order, spec in specs do
 		local button = UIKit.button({
@@ -238,7 +238,6 @@ local function buildMenuButtons()
 		menuButtons[spec.Id] = button
 		badges[spec.Id] = badge(button)
 	end
-	menuButtons.Daily.Visible = false
 end
 
 local function buildActions()
@@ -467,8 +466,15 @@ local function refreshData()
 	end
 	badges.Upgrades.Visible = affordable
 	local canClaim = data.DailyLastClaimDay < data.Today
-	menuButtons.Daily.Visible = canClaim
-	badges.Daily.Visible = canClaim
+	local orderReady = false
+	if data.Orders then
+		for i, order in data.Orders.List do
+			if not data.Orders.Claimed[i] and data.Orders.Progress[i] >= order.Target then
+				orderReady = true
+			end
+		end
+	end
+	badges.Tasks.Visible = canClaim or orderReady
 end
 
 local function refreshStack()
@@ -507,11 +513,16 @@ local function updateWobble()
 		boostLabel.Text = "⚡2x " .. Format.duration(boost)
 	end
 
+	local now = Workspace:GetServerTimeNow()
 	local rainEnds = Workspace:GetAttribute("RainEndsAt")
-	local rainLeft = if typeof(rainEnds) == "number" then rainEnds - Workspace:GetServerTimeNow() else 0
-	rainLabel.Visible = rainLeft > 0
+	local rainLeft = if typeof(rainEnds) == "number" then rainEnds - now else 0
+	local goldEnds = Workspace:GetAttribute("GoldenEndsAt")
+	local goldLeft = if typeof(goldEnds) == "number" then goldEnds - now else 0
+	rainLabel.Visible = rainLeft > 0 or goldLeft > 0
 	if rainLeft > 0 then
 		rainLabel.Text = "🌧️ ITEM RAIN " .. Format.duration(rainLeft)
+	elseif goldLeft > 0 then
+		rainLabel.Text = "✨ GOLDEN HOUR " .. Format.duration(goldLeft)
 	end
 end
 
@@ -564,10 +575,6 @@ function HUD.init()
 		end
 	end)
 
-	menuButtons.Daily.Activated:Connect(function()
-		Audio.play("Click")
-		Remotes.ClaimDaily:FireServer()
-	end)
 
 	Remotes.Notify.OnClientEvent:Connect(function(message)
 		if typeof(message) ~= "table" or typeof(message.Text) ~= "string" then

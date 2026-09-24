@@ -17,7 +17,7 @@ MonetizationConfig.GamePasses = {
 		Id = 0,
 		PriceHint = 199,
 		DisplayName = "VIP",
-		Description = "+20% coins, golden stack base, VIP tag, +1 daily glue.",
+		Description = "+20% coins, Golden Tray base, VIP tag, +1 daily glue.",
 		Icon = "👑",
 		CoinMult = 1.2,
 		DailyGlue = 1,
@@ -37,11 +37,43 @@ MonetizationConfig.GamePasses = {
 		Description = "Leave a rainbow behind you.",
 		Icon = "🌈",
 	},
+	UfoBase = {
+		Id = 0,
+		PriceHint = 99,
+		DisplayName = "UFO Saucer Base",
+		Description = "Your tower rides a glowing saucer.",
+		Icon = "🛸",
+	},
+	FlameBase = {
+		Id = 0,
+		PriceHint = 149,
+		DisplayName = "Flame Ring Base",
+		Description = "Your tower stands on fire. Literally.",
+		Icon = "🔥",
+	},
 }
 
-MonetizationConfig.PassOrder = { "DoubleCoins", "VIP", "MagnetHands", "RainbowTrail" }
+MonetizationConfig.PassOrder = { "DoubleCoins", "VIP", "MagnetHands", "RainbowTrail", "UfoBase", "FlameBase" }
 
 MonetizationConfig.Products = {
+	-- Shown once; hidden after purchase. A repeat purchase still grants the glue.
+	StarterPack = {
+		Id = 0,
+		PriceHint = 99,
+		DisplayName = "Starter Pack",
+		Description = "10 glue, 30 min of 2x coins and the Starter Crate base.",
+		Icon = "🎁",
+		OneTime = true,
+		Grant = { Glue = 10, BoostSeconds = 1800, Cosmetic = "crate" },
+	},
+	GoldenHour = {
+		Id = 0,
+		PriceHint = 149,
+		DisplayName = "Golden Hour",
+		Description = "10 min of 5x shiny & golden chances for the WHOLE server.",
+		Icon = "✨",
+		Grant = { GoldenHour = 600 },
+	},
 	Glue3 = {
 		Id = 0,
 		PriceHint = 25,
@@ -92,7 +124,7 @@ MonetizationConfig.Products = {
 	},
 }
 
-MonetizationConfig.ProductOrder = { "Glue3", "Boost15", "ItemRain", "CoinsSmall", "Glue10", "CoinsLarge" }
+MonetizationConfig.ProductOrder = { "StarterPack", "Glue3", "Boost15", "ItemRain", "GoldenHour", "CoinsSmall", "Glue10", "CoinsLarge" }
 
 -- Receipts remembered per player to make grants idempotent.
 MonetizationConfig.ReceiptHistory = 60

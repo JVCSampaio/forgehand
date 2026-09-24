@@ -1,0 +1,464 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Stackhead art</title>
+<link rel="stylesheet" href="fonts.css">
+<script type="importmap">
+{ "imports": { "three": "./node_modules/three/build/three.module.js", "three/addons/": "./node_modules/three/examples/jsm/" } }
+</script>
+<style>
+  html, body { margin: 0; overflow: hidden; background: #000; font-family: 'Fredoka One', 'Noto Color Emoji', sans-serif; }
+  canvas { display: block; }
+  .overlay { position: absolute; inset: 0; pointer-events: none; }
+  .logo {
+    position: absolute; font-size: 150px; line-height: 1; letter-spacing: 2px; transform: rotate(-4deg);
+    background: linear-gradient(180deg, #fff6b0 0%, #ffd23c 45%, #ff9a1e 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 10px #2a1540; paint-order: stroke fill; filter: drop-shadow(0 10px 0 #2a1540) drop-shadow(0 18px 24px rgba(0,0,0,0.45));
+  }
+  .logo-sub { position: absolute; font-size: 54px; color: #fff; transform: rotate(-4deg); -webkit-text-stroke: 8px #2a1540; paint-order: stroke fill; filter: drop-shadow(0 6px 0 #2a1540); }
+  .sticker {
+    position: absolute; padding: 14px 34px; border-radius: 26px; font-size: 76px; color: #fff; transform: rotate(-6deg);
+    background: linear-gradient(180deg, #ff5d8f, #e6245e); border: 8px solid #2a1540; box-shadow: 0 12px 0 #2a1540, 0 20px 30px rgba(0,0,0,0.35);
+    -webkit-text-stroke: 6px #2a1540; paint-order: stroke fill;
+  }
+  .bubble {
+    position: absolute; transform: translate(-50%, -100%); padding: 6px 22px; border-radius: 40px; font-size: 64px; color: #ffe066;
+    background: rgba(28, 20, 48, 0.9); border: 6px solid #fff; -webkit-text-stroke: 4px #2a1540; paint-order: stroke fill; white-space: nowrap;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.35);
+  }
+  .tag { position: absolute; font-size: 54px; color: #fff; -webkit-text-stroke: 8px #2a1540; paint-order: stroke fill; filter: drop-shadow(0 6px 0 #2a1540); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="overlay" id="overlay"></div>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const params = new URLSearchParams(location.search);
+const SHOT = params.get('shot') || 'tower';
+const W = innerWidth, H = innerHeight;
+const [scene, catalog] = await Promise.all([(await fetch('scene.json')).json(), (await fetch('items.json')).json()]);
+const ITEMS = Object.fromEntries(catalog.Items.map((i) => [i.Id, i]));
+const BASES = Object.fromEntries(catalog.Bases.map((b) => [b.Id, b]));
+await document.fonts.ready;
+
+// ---------------------------------------------------------------- renderer
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
+document.body.prepend(renderer.domElement);
+
+const world = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+world.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+world.environmentIntensity = 0.55;
+
+const WORLD_X = { Stackville: 0, Frostpeak: 2400, CandyCoast: 4800, NeonCity: 7200 };
+const LOOKS = {
+  Stackville: { sky: ['#2f86e8', '#8cc8f5', '#e8f4fb'], fog: 0xcfe6f7, sun: 0xfff0d8, sunI: 3.0, hemi: [0xdfeeff, 0x8a7a66, 1.1] },
+  Frostpeak: { sky: ['#4a8fe0', '#b8d8f6', '#f2f7fc'], fog: 0xe6f0fa, sun: 0xfff8ef, sunI: 3.0, hemi: [0xeef6ff, 0x9aa6b8, 1.2] },
+  CandyCoast: { sky: ['#ff7fbf', '#ffc0dc', '#fff2e2'], fog: 0xffe2ef, sun: 0xfff0f6, sunI: 2.8, hemi: [0xfff0f8, 0xc08aa6, 1.2] },
+  NeonCity: { sky: ['#140c38', '#4d2a86', '#e2589a'], fog: 0x3a2466, sun: 0xff9ad0, sunI: 1.2, hemi: [0x9a80e0, 0x2a1840, 1.0] },
+};
+
+function skyTexture(colors) {
+  const c = document.createElement('canvas'); c.width = 4; c.height = 512;
+  const g = c.getContext('2d'); const grad = g.createLinearGradient(0, 0, 0, 512);
+  grad.addColorStop(0, colors[0]); grad.addColorStop(0.6, colors[1]); grad.addColorStop(1, colors[2]);
+  g.fillStyle = grad; g.fillRect(0, 0, 4, 512);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
+function setupLook(name, target, radius) {
+  const look = LOOKS[name];
+  world.background = skyTexture(look.sky);
+  world.fog = new THREE.Fog(look.fog, 220, 1200);
+  world.add(new THREE.HemisphereLight(look.hemi[0], look.hemi[1], look.hemi[2]));
+  const sun = new THREE.DirectionalLight(look.sun, look.sunI);
+  sun.position.copy(target).add(new THREE.Vector3(-120, 220, 140));
+  sun.target.position.copy(target);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(4096, 4096);
+  const sc = sun.shadow.camera; sc.left = -radius; sc.right = radius; sc.top = radius; sc.bottom = -radius; sc.near = 1; sc.far = 800;
+  sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.04; sun.shadow.radius = 3;
+  world.add(sun, sun.target);
+  // Soft rim light from behind for the characters.
+  const rim = new THREE.DirectionalLight(0xffffff, 0.9);
+  rim.position.copy(target).add(new THREE.Vector3(80, 60, -160));
+  world.add(rim);
+}
+
+// ---------------------------------------------------------------- materials
+const matCache = new Map();
+function material(k, mat, t = 0, r = 0, opts = {}) {
+  const key = `${k}|${mat}|${t}|${r}|${JSON.stringify(opts)}`;
+  if (matCache.has(key)) return matCache.get(key);
+  const color = new THREE.Color().setRGB(k[0] / 255, k[1] / 255, k[2] / 255, THREE.SRGBColorSpace);
+  const o = { color, roughness: 0.55, metalness: 0.0 };
+  switch (mat) {
+    case 'Neon': Object.assign(o, { emissive: color, emissiveIntensity: 2.2, roughness: 0.4 }); break;
+    case 'Metal': case 'DiamondPlate': Object.assign(o, { roughness: 0.3, metalness: 0.7 }); break;
+    case 'CorrodedMetal': Object.assign(o, { roughness: 0.75, metalness: 0.35 }); break;
+    case 'Foil': Object.assign(o, { roughness: 0.18, metalness: 0.95, emissive: color, emissiveIntensity: 0.12 }); break;
+    case 'Glass': Object.assign(o, { roughness: 0.05, metalness: 0.2 }); break;
+    case 'Ice': Object.assign(o, { roughness: 0.08, metalness: 0.1 }); break;
+    case 'Wood': case 'WoodPlanks': case 'Fabric': case 'Sand': case 'Snow': case 'Grass': case 'Slate': case 'Ground': Object.assign(o, { roughness: 0.92 }); break;
+  }
+  if (t > 0) Object.assign(o, { transparent: true, opacity: Math.max(0.3, 1 - t * 0.9) });
+  if (r > 0) o.metalness = Math.max(o.metalness, r);
+  Object.assign(o, opts);
+  const m = new THREE.MeshStandardMaterial(o);
+  matCache.set(key, m);
+  return m;
+}
+
+function wedgeGeometry() {
+  const v = [[-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, -0.5, 0.5], [-0.5, -0.5, 0.5], [-0.5, 0.5, 0.5], [0.5, 0.5, 0.5]];
+  const faces = [[0, 2, 1], [0, 3, 2], [3, 5, 2], [3, 4, 5], [0, 4, 3], [1, 2, 5], [0, 1, 5], [0, 5, 4]];
+  const pos = []; for (const f of faces) for (const i of f) pos.push(...v[i]);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
+}
+const GEOM = {
+  Block: new THREE.BoxGeometry(1, 1, 1),
+  Ball: new THREE.SphereGeometry(0.5, 40, 24),
+  Cylinder: new THREE.CylinderGeometry(0.5, 0.5, 1, 40).rotateZ(Math.PI / 2),
+  Wedge: wedgeGeometry(),
+};
+
+// ---------------------------------------------------------------- map
+// Distance from point p to segment ab.
+function segDist(p, a, b) {
+  const ab = b.clone().sub(a); const t = Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / ab.lengthSq()));
+  return p.distanceTo(a.clone().addScaledVector(ab, t));
+}
+// clear: [[from, to, radius], ...] — map parts near these segments are skipped
+// so props never block the shot.
+function addWorld(name, center, maxDist, clear = []) {
+  const x0 = WORLD_X[name];
+  for (const p of scene.parts) {
+    if (p.a) continue;
+    const [x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22] = p.m;
+    if (name === 'Stackville' && Math.hypot(x - 26.9, z - 26.9) < 9) continue;
+    if (Math.max(p.z[0], p.z[1], p.z[2]) < 60 && clear.some(([a, b, r]) => segDist(new THREE.Vector3(x, y, z), a, b) < r + Math.min(p.z[0], p.z[1], p.z[2]) / 2)) continue;
+    if (Math.abs(x - x0) > 1200 && !(p.z[0] > 2000)) continue;
+    const big = p.z[0] > 300 || p.z[2] > 300;
+    if (!big && Math.hypot(x - center.x, z - center.z) > maxDist) continue;
+    const shape = p.c === 'WedgePart' ? 'Wedge' : (GEOM[p.s] ? p.s : 'Block');
+    const mesh = new THREE.Mesh(GEOM[shape], material(p.k, p.mat, p.t, p.r));
+    const sx = p.z[0], sy = p.z[1], sz = p.z[2];
+    let scale;
+    if (shape === 'Ball') { const d = Math.min(sx, sy, sz); scale = [d, d, d]; }
+    else if (shape === 'Cylinder') { const d = Math.min(sy, sz); scale = [sx, d, d]; }
+    else scale = [sx, sy, sz];
+    mesh.matrixAutoUpdate = false;
+    mesh.matrix.set(r00, r01, r02, x, r10, r11, r12, y, r20, r21, r22, z, 0, 0, 0, 1).multiply(new THREE.Matrix4().makeScale(...scale));
+    mesh.castShadow = !big && p.t < 0.5;
+    mesh.receiveShadow = true;
+    world.add(mesh);
+  }
+}
+
+// ---------------------------------------------------------------- items
+const GOLD = [255, 196, 40];
+function lerpColor(a, b, t) { return a.map((v, i) => Math.round(v + (b[i] - v) * t)); }
+
+function partMesh(spec, rarity) {
+  let color = spec.Color;
+  let mat = spec.Material || 'SmoothPlastic';
+  let opts = {};
+  if (rarity === 'g') { color = lerpColor(GOLD, color, 0.15); mat = 'Foil'; opts = { emissiveIntensity: 0.25 }; }
+  else if (rarity === 's') { color = lerpColor(color, [255, 255, 255], 0.35); mat = 'Glass'; opts = { emissive: new THREE.Color(0x335577), emissiveIntensity: 0.4 }; }
+  const [sx, sy, sz] = spec.Size;
+  let geom, size;
+  if (spec.Shape === 'Ball') { geom = GEOM.Ball; const d = Math.min(sx, sy, sz); size = [d, d, d]; }
+  else if (spec.Shape === 'VCylinder') { geom = new THREE.CylinderGeometry(0.5, 0.5, 1, 40); size = [sx, sy, sz]; }
+  else if (spec.Shape === 'HCylinder') { geom = GEOM.Cylinder; size = [sx, sy, sz]; }
+  else if (spec.Shape === 'Wedge') { geom = GEOM.Wedge; size = [sx, sy, sz]; }
+  else { const r = Math.min(sx, sy, sz) * 0.14; geom = new RoundedBoxGeometry(sx, sy, sz, 3, r); size = [1, 1, 1]; }
+  const mesh = new THREE.Mesh(geom, material(color, mat, spec.Transparency || 0, 0, opts));
+  mesh.scale.set(...size);
+  const off = spec.Offset || [0, 0, 0];
+  mesh.position.set(...off);
+  const rot = spec.Rot || [0, 0, 0];
+  mesh.rotation.set(THREE.MathUtils.degToRad(rot[0]), THREE.MathUtils.degToRad(rot[1]), THREE.MathUtils.degToRad(rot[2]), 'XYZ');
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  return mesh;
+}
+
+function itemGroup(code) {
+  const def = ITEMS[code.slice(0, 3)];
+  const rarity = code.slice(3);
+  const g = new THREE.Group();
+  for (const spec of def.Parts) g.add(partMesh(spec, rarity));
+  if (rarity) {
+    const light = new THREE.PointLight(rarity === 'g' ? 0xffc828 : 0xaae6ff, 3, 7);
+    g.add(light);
+    g.userData.sparkle = rarity;
+  }
+  return { group: g, height: def.Height };
+}
+
+function baseGroup(id) {
+  const def = BASES[id];
+  const g = new THREE.Group();
+  for (const spec of def.Parts) g.add(partMesh(spec, ''));
+  return { group: g, height: def.Height };
+}
+
+// Stack bent like the in-game renderer: lean spread along the height.
+function buildStack(anchor, codes, lean, baseId) {
+  const items = codes.map(itemGroup);
+  const total = items.reduce((s, i) => s + i.height, 0);
+  const per = new THREE.Vector2(lean[0], lean[1]).divideScalar(Math.max(total, 12));
+  const cf = new THREE.Matrix4().makeTranslation(anchor.x, anchor.y, anchor.z);
+  const place = (group, h, yaw) => {
+    cf.multiply(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(per.y * h, 0, -per.x * h)));
+    const center = cf.clone().multiply(new THREE.Matrix4().makeTranslation(0, h / 2, 0)).multiply(new THREE.Matrix4().makeRotationY(yaw));
+    group.matrixAutoUpdate = false; group.matrix.copy(center); world.add(group);
+    cf.multiply(new THREE.Matrix4().makeTranslation(0, h, 0));
+  };
+  if (baseId) { const b = baseGroup(baseId); place(b.group, b.height, 0); }
+  items.forEach((it, i) => place(it.group, it.height, THREE.MathUtils.degToRad(((i + 1) * 137) % 60 - 30)));
+  return new THREE.Vector3().setFromMatrixPosition(cf);
+}
+
+function randomCodes(tiers, count, seed, rareRate = 0.08) {
+  let s = seed * 9301 + 49297;
+  const rnd = () => { s = (s * 48271) % 2147483647; return s / 2147483647; };
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const tier = tiers[Math.floor(rnd() * tiers.length)];
+    const pool = catalog.Items.filter((it) => it.Tier === tier);
+    const it = pool[Math.floor(rnd() * pool.length)];
+    const roll = rnd();
+    out.push(it.Id + (roll < rareRate * 0.35 ? 'g' : roll < rareRate ? 's' : ''));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------- avatar
+function faceTexture(kind) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#000'; g.globalAlpha = 1;
+  const eye = (x) => {
+    g.fillStyle = '#1b1b24'; g.beginPath(); g.ellipse(x, 100, 16, kind === 'wow' ? 26 : 22, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#fff'; g.beginPath(); g.ellipse(x + 5, 91, 6, 7, 0, 0, Math.PI * 2); g.fill();
+  };
+  eye(92); eye(164);
+  g.fillStyle = 'rgba(255,120,120,0.45)';
+  g.beginPath(); g.ellipse(64, 142, 18, 10, 0, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.ellipse(192, 142, 18, 10, 0, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#1b1b24'; g.lineWidth = 9; g.lineCap = 'round';
+  if (kind === 'wow') {
+    g.fillStyle = '#3a1020'; g.beginPath(); g.ellipse(128, 168, 22, 28, 0, 0, Math.PI * 2); g.fill();
+  } else if (kind === 'grin') {
+    g.fillStyle = '#3a1020'; g.beginPath(); g.moveTo(80, 150); g.quadraticCurveTo(128, 222, 176, 150); g.closePath(); g.fill();
+    g.fillStyle = '#fff'; g.fillRect(96, 150, 64, 12);
+  } else {
+    g.beginPath(); g.arc(128, 140, 38, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
+function avatar({ pos, yaw = 0, skin = [255, 205, 60], shirt = [30, 110, 200], pants = [40, 130, 70], face = 'grin', pose = 'carry' }) {
+  const root = new THREE.Group();
+  root.position.copy(pos); root.rotation.y = yaw;
+  const box = (w, h, d, color, x, y, z, mat = 'SmoothPlastic') => {
+    const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, 0.12), material(color, mat));
+    m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; return m;
+  };
+  const torso = box(2, 2, 1, shirt, 0, 3, 0);
+  root.add(torso);
+  // Shirt stripe.
+  root.add(box(2.02, 0.35, 1.02, lerpColor(shirt, [255, 255, 255], 0.7), 0, 3.3, 0));
+  const legL = box(1, 2, 1, pants, -0.5, 1, 0), legR = box(1, 2, 1, pants, 0.5, 1, 0);
+  if (pose === 'run') { legL.rotation.x = 0.55; legL.position.z = -0.3; legR.rotation.x = -0.55; legR.position.z = 0.3; }
+  root.add(legL, legR);
+  const arm = (side) => {
+    const pivot = new THREE.Group(); pivot.position.set(side * 1.5, 3.9, 0);
+    const a = box(1, 2, 1, skin, 0, -0.9, 0); pivot.add(a);
+    if (pose === 'carry') { pivot.rotation.z = side * -2.6; pivot.rotation.x = 0.1; }
+    else if (pose === 'run') { pivot.rotation.x = side * 0.9; }
+    else if (pose === 'panic') { pivot.rotation.z = side * -2.3; pivot.rotation.x = -0.4; }
+    return pivot;
+  };
+  root.add(arm(-1), arm(1));
+  const head = new THREE.Mesh(new RoundedBoxGeometry(1.3, 1.25, 1.25, 4, 0.32), material(skin, 'SmoothPlastic'));
+  head.position.set(0, 4.65, 0); head.castShadow = true; root.add(head);
+  const faceMat = new THREE.MeshStandardMaterial({ map: faceTexture(face), transparent: true, roughness: 0.6 });
+  const facePlane = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), faceMat);
+  facePlane.position.set(0, 4.62, 0.63); root.add(facePlane);
+  world.add(root);
+  root.updateMatrixWorld(true);
+  return root.localToWorld(new THREE.Vector3(0, 5.3, 0));
+}
+
+// ---------------------------------------------------------------- effects
+// Disabled: additive sprites turn into dark squares under the GTAO pass.
+function sparkles() {}
+function sparklesUnused(center, count, spread, color = 0xfff3a0) {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+  const g = c.getContext('2d'); const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(0.3, 'rgba(255,240,170,0.9)'); grad.addColorStop(1, 'rgba(255,220,120,0)');
+  g.fillStyle = grad; g.fillRect(0, 0, 64, 64);
+  const tex = new THREE.CanvasTexture(c);
+  for (let i = 0; i < count; i++) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color, blending: THREE.AdditiveBlending, depthWrite: false }));
+    s.position.set(center.x + (Math.random() - 0.5) * spread, center.y + (Math.random() - 0.5) * spread, center.z + (Math.random() - 0.5) * spread);
+    const k = 0.4 + Math.random() * 1.2; s.scale.set(k, k, k); world.add(s);
+  }
+}
+
+function speedLines(from, dir, count) {
+  for (let i = 0; i < count; i++) {
+    const len = 4 + Math.random() * 6;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, len), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }));
+    const p = from.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, 1 + Math.random() * 4, (Math.random() - 0.5) * 3));
+    m.position.copy(p.addScaledVector(dir, -len / 2 - 1));
+    m.lookAt(m.position.clone().add(dir));
+    world.add(m);
+  }
+}
+
+// ---------------------------------------------------------------- overlay
+const overlay = document.getElementById('overlay');
+function html(tag, cls, text, style) { const e = document.createElement(tag); e.className = cls; e.innerHTML = text; Object.assign(e.style, style); overlay.appendChild(e); return e; }
+function project(camera, v) { const p = v.clone().project(camera); return [(p.x + 1) / 2 * W, (1 - p.y) / 2 * H]; }
+
+// ---------------------------------------------------------------- post
+function render(camera, { focus, aperture = 0.00012, bloom = 0.35, dof = true, ao = true }) {
+  const composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(world, camera));
+  if (ao) {
+    const gtao = new GTAOPass(world, camera, W, H);
+    gtao.updateGtaoMaterial({ radius: 0.9, distanceExponent: 1.5, thickness: 1.5, scale: 1.1 });
+    gtao.blendIntensity = 0.9;
+    composer.addPass(gtao);
+  }
+  if (dof && focus) composer.addPass(new BokehPass(world, camera, { focus, aperture, maxblur: 0.008 }));
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), bloom, 0.5, 0.86));
+  composer.addPass(new OutputPass());
+  // Vignette + a touch of saturation.
+  composer.addPass(new ShaderPass({
+    uniforms: { tDiffuse: { value: null } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+      void main(){ vec4 c = texture2D(tDiffuse, vUv); float l = dot(c.rgb, vec3(0.299,0.587,0.114));
+      c.rgb = mix(vec3(l), c.rgb, 1.18); float d = distance(vUv, vec2(0.5)); c.rgb *= smoothstep(0.95, 0.35, d) * 0.28 + 0.72; gl_FragColor = c; }`,
+  }));
+  composer.render();
+}
+
+function cameraAt(pos, look, fov) {
+  const cam = new THREE.PerspectiveCamera(fov, W / H, 0.3, 4000);
+  cam.position.copy(pos); cam.lookAt(look); cam.updateMatrixWorld(); return cam;
+}
+
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+// ---------------------------------------------------------------- shots
+const SHOTS = {
+  tower() {
+    const o = WORLD_X.Stackville;
+    setupLook('Stackville', V(o, 20, 60), 120);
+    const hero = V(o + 1, 0.45, 70);
+    const camPos = hero.clone().add(V(9.5, 3.6, 15.5));
+    addWorld('Stackville', V(o, 0, 60), 420, [[camPos, hero.clone().add(V(0, 20, 0)), 6]]);
+    const top = avatar({ pos: hero, yaw: 0.55, face: 'grin' });
+    const codes = [...randomCodes([1, 2, 3, 4], 64, 5, 0.12)];
+    codes.splice(30, 0, 'pigg', 'carg'); codes.splice(12, 0, 'chsg');
+    const stackTop = buildStack(top, codes, [-1.6, 0.35], 'gold');
+    avatar({ pos: V(o - 14, 0.45, 52), yaw: 1.2, shirt: [200, 40, 40], pants: [30, 40, 60], skin: [234, 184, 146], face: 'smile' });
+    buildStack(V(o - 14, 5.75, 52), randomCodes([1, 2], 14, 9), [0.2, 0.05], 'pizza');
+    avatar({ pos: V(o + 20, 0.45, 44), yaw: -0.4, shirt: [110, 60, 170], pants: [60, 60, 70], skin: [160, 95, 53], face: 'smile' });
+    buildStack(V(o + 20, 5.75, 44), randomCodes([1], 9, 3), [0, 0.1], 'plate');
+    sparkles(top.clone().add(V(-4, 22, 0)), 26, 16);
+    const cam = cameraAt(camPos, hero.clone().add(V(-4, 13.5, -2)), 64);
+    render(cam, { focus: 18.5, aperture: 0.00018 });
+    html('div', 'logo', 'STACKHEAD', { left: '70px', top: '50px' });
+    html('div', 'logo-sub', 'STACK EVERYTHING!', { left: '96px', top: '225px' });
+    const [bx, by] = project(cam, top.clone().add(V(-2.5, 26, 0)));
+    html('div', 'bubble', '📦 ' + codes.length, { left: Math.min(W - 200, bx + 240) + 'px', top: Math.max(360, by) + 'px' });
+    html('div', 'sticker', 'HOW HIGH<br>CAN YOU GO?', { right: '70px', bottom: '70px', fontSize: '64px', textAlign: 'center' });
+  },
+  crash() {
+    const o = WORLD_X.Stackville;
+    setupLook('Stackville', V(o, 15, 60), 120);
+    const camPos = V(o + 7, 6, 86);
+    addWorld('Stackville', V(o, 0, 60), 420, [[camPos, V(o, 10, 66), 4]]);
+    const top = avatar({ pos: V(o, 0.45, 66), yaw: 0.3, face: 'wow', pose: 'panic' });
+    const codes = randomCodes([1, 2, 3, 4], 60, 21, 0.14);
+    const standing = codes.slice(0, 14);
+    const mid = buildStack(top, standing, [1.4, 0.3], 'cushion');
+    // The rest explodes outward and falls.
+    let seed = 7;
+    const rnd = () => { seed = (seed * 48271) % 2147483647; return seed / 2147483647; };
+    codes.slice(14).forEach((code, i) => {
+      const it = itemGroup(code);
+      const t = i / 46;
+      const angle = rnd() * Math.PI * 2;
+      const out = 3 + t * 16 + rnd() * 5;
+      const p = mid.clone().add(V(Math.cos(angle) * out, 6 + t * 26 - out * 0.35 + rnd() * 6, Math.sin(angle) * out * 0.7));
+      it.group.position.copy(p);
+      it.group.rotation.set(rnd() * 6, rnd() * 6, rnd() * 6);
+      world.add(it.group);
+    });
+    sparkles(mid.clone().add(V(0, 8, 0)), 40, 22, 0xffe070);
+    const bumper = V(o + 6, 0.45, 69);
+    avatar({ pos: bumper, yaw: -1.2, shirt: [220, 50, 50], pants: [30, 30, 40], skin: [234, 184, 146], face: 'grin', pose: 'run' });
+    speedLines(bumper, V(-1, 0, -0.35).normalize(), 12);
+    const cam = cameraAt(camPos, V(o + 1, 15.5, 63), 62);
+    render(cam, { focus: 21 });
+    html('div', 'logo', 'STACKHEAD', { left: '70px', top: '50px', fontSize: '130px' });
+    html('div', 'sticker', "DON'T DROP IT!", { right: '70px', bottom: '80px', fontSize: '80px' });
+    html('div', 'tag', '💥 BUMPED!', { left: project(cam, bumper.clone().add(V(0, 8, 0)))[0] - 120 + 'px', top: project(cam, bumper.clone().add(V(0, 8, 0)))[1] - 60 + 'px' });
+  },
+  panel() {
+    const name = params.get('world');
+    const o = WORLD_X[name];
+    const tiers = { Stackville: [1, 2, 3, 4], Frostpeak: [5, 6, 7, 8], CandyCoast: [9, 10, 11, 12], NeonCity: [13, 14, 15, 16] }[name];
+    const bases = { Stackville: 'pizza', Frostpeak: 'snow', CandyCoast: 'donut', NeonCity: 'holo' };
+    setupLook(name, V(o, 20, 80), 140);
+    addWorld(name, V(o, 0, 100), 700, [[V(o + 2.5, 5, 22), V(o, 8, 44), 3]]);
+    const top = avatar({ pos: V(o, 0.45, 44), yaw: Math.PI * 0.95, face: 'grin' });
+    buildStack(top, randomCodes(tiers, 46, o + 3, 0.12), [0.9, -0.3], bases[name]);
+    const cam = cameraAt(V(o + 2.5, 5, 22), V(o - 1, 21, 100), 62);
+    render(cam, { focus: 22, bloom: name === 'NeonCity' ? 0.6 : 0.35 });
+  },
+  icon() {
+    const o = WORLD_X.Stackville;
+    setupLook('Stackville', V(o, 20, 60), 80);
+    const hero = V(o, 0.45, 70);
+    const camPos = hero.clone().add(V(4.6, 5.4, 9.4));
+    addWorld('Stackville', V(o, 0, 60), 300, [[camPos, hero.clone().add(V(0, 5, 0)), 3]]);
+    const top = avatar({ pos: hero, yaw: 0.45, face: 'grin' });
+    const codes = randomCodes([1, 2, 3, 4], 30, 12, 0.18);
+    codes.splice(6, 0, 'pigg');
+    codes.splice(3, 0, 'carg');
+    buildStack(top, codes, [-1.1, 0.2], 'gold');
+    const cam = cameraAt(camPos, hero.clone().add(V(-1.6, 8.6, 0)), 66);
+    render(cam, { focus: 10, aperture: 0.00035 });
+  },
+};
+
+SHOTS[SHOT]();
+document.title = 'ready';
+</script>
+</body>
+</html>

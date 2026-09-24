@@ -10,6 +10,7 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local GameConfig = require(Shared.Config.GameConfig)
+local CosmeticConfig = require(Shared.Config.CosmeticConfig)
 local ItemBuilder = require(Shared.ItemBuilder)
 local StackCodec = require(Shared.StackCodec)
 
@@ -29,6 +30,7 @@ type Render = {
 	Anchor: Part,
 	Visible: boolean,
 	LastTop: CFrame?,
+	Base: RenderItem?,
 }
 
 local localPlayer = Players.LocalPlayer
@@ -117,6 +119,36 @@ local function sync(render: Render)
 	render.Label.Enabled = render.Count > 0
 end
 
+-- The cosmetic platform under the stack (shown only while carrying).
+local function syncBase(render: Render)
+	if render.Base then
+		render.Base.Model:Destroy()
+		render.Base = nil
+	end
+	local id = render.Player:GetAttribute("Base")
+	local base = CosmeticConfig.ById[if typeof(id) == "string" then id else CosmeticConfig.Default]
+	if not base then
+		return
+	end
+	local model = ItemBuilder.buildParts(base.Parts, base.Name)
+	local parts, offsets = {}, {}
+	for _, child in model:GetDescendants() do
+		if child:IsA("BasePart") then
+			child.CanQuery = false
+			table.insert(parts, child)
+			table.insert(offsets, child:GetAttribute("Offset") or CFrame.identity)
+		end
+	end
+	if base.Fire and model.PrimaryPart then
+		local fire = Instance.new("Fire")
+		fire.Size = 3
+		fire.Heat = 6
+		fire.Parent = model.PrimaryPart
+	end
+	model.Parent = render.Folder
+	render.Base = { Code = base.Id, Model = model, Parts = parts, Offsets = offsets, Height = base.Height, Yaw = CFrame.identity }
+end
+
 local function addPlayer(player: Player)
 	if renders[player] then
 		return
@@ -173,7 +205,11 @@ local function addPlayer(player: Player)
 	player:GetAttributeChangedSignal("Stack"):Connect(function()
 		sync(render)
 	end)
+	player:GetAttributeChangedSignal("Base"):Connect(function()
+		syncBase(render)
+	end)
 	sync(render)
+	syncBase(render)
 end
 
 local function removePlayer(player: Player)
@@ -238,6 +274,15 @@ local function step(dt: number)
 
 		local yawOnly = CFrame.fromOrientation(0, select(2, root.CFrame:ToOrientation()), 0)
 		local cfWorldTilt = CFrame.new(head.Position + Vector3.new(0, head.Size.Y / 2 + 0.1, 0))
+		local base = render.Base
+		if base then
+			local center = cfWorldTilt * CFrame.new(0, base.Height / 2, 0) * yawOnly
+			for i, part in base.Parts do
+				table.insert(parts, part)
+				table.insert(cframes, center * base.Offsets[i])
+			end
+			cfWorldTilt = cfWorldTilt * CFrame.new(0, base.Height, 0)
+		end
 		for _, item in render.Items do
 			local h = item.Height
 			cfWorldTilt = cfWorldTilt * CFrame.Angles(perStud.Y * h, 0, -perStud.X * h)

@@ -6,6 +6,8 @@ wobbles too much and comes crashing down for everyone else to grab.
 
 - Design and market notes: [`docs/DESIGN.md`](docs/DESIGN.md)
 - Economy model: [`docs/ECONOMY.md`](docs/ECONOMY.md)
+- Monetization strategy: [`docs/MONETIZATION.md`](docs/MONETIZATION.md)
+- Store art: [`marketing/`](marketing/)
 - Handoff state: [`PROJECT_STATE.md`](PROJECT_STATE.md)
 
 ## Play it in Studio
@@ -57,18 +59,22 @@ Staged players/stacks and the HUD overlay are mock-ups for the screenshot;
 lighting and materials are approximations of Roblox's renderer.
 
 ```bash
-lune run tools/preview/export_scene.luau build/Stackhead.rbxl build/preview/scene.json
-cp tools/preview/preview.html build/preview/index.html
-# also copy three.module.min.js and fonts into build/preview, then:
-(cd build/preview && python3 -m http.server 8123) &
-node tools/preview/shoot.mjs http://localhost:8123 build/preview/shots
+tools/preview/run.sh overview gameplay street     # -> build/preview/shots/<World>-<view>.png
+WORLDS="Frostpeak:2400" tools/preview/run.sh shore
+```
+
+Marketing art (thumbnails 1920×1080, icon 512×512) is rendered the same way with
+post-processing:
+
+```bash
+tools/art/run.sh                                  # -> marketing/*.png
 ```
 
 ## Layout
 
 ```
 src/shared   → ReplicatedStorage.Shared    configs + pure logic + item builder
-src/server   → ServerScriptService.Server  Main + Services + Util (pure, tested)
+src/server   → ServerScriptService.Server  Main + Services + World (kit, props, themes) + Util
 src/client   → StarterPlayerScripts.Client Main + Controllers (UI, rendering, fx)
 tests/       Lune unit tests          tools/  economy sim, place verifier
 ```

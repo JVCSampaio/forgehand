@@ -81,24 +81,29 @@ local function addRarityFx(root: BasePart, rarity: string)
 	sparkle.Parent = root
 end
 
--- Returns a Model whose parts carry an "Offset" attribute relative to the
--- item's centre. The PrimaryPart is the first part.
-function ItemBuilder.build(code: string): Model?
-	local itemId, rarity = StackCodec.parse(code)
-	local def = ItemConfig.ById[itemId]
-	if not def then
-		return nil
-	end
+-- Builds a Model from primitive part specs (see ItemConfig). Parts carry an
+-- "Offset" attribute relative to the model centre; PrimaryPart = first part.
+function ItemBuilder.buildParts(specs, name: string, rarity: string?): Model
 	local model = Instance.new("Model")
-	model.Name = def.Name
-	for index, spec in def.Parts do
-		local part = makePart(spec, rarity)
+	model.Name = name
+	for index, spec in specs do
+		local part = makePart(spec, rarity or "")
 		part.Name = if index == 1 then "Root" else "Part" .. index
 		part.Parent = model
 		if index == 1 then
 			model.PrimaryPart = part
 		end
 	end
+	return model
+end
+
+function ItemBuilder.build(code: string): Model?
+	local itemId, rarity = StackCodec.parse(code)
+	local def = ItemConfig.ById[itemId]
+	if not def then
+		return nil
+	end
+	local model = ItemBuilder.buildParts(def.Parts, def.Name, rarity)
 	addRarityFx(model.PrimaryPart :: BasePart, rarity)
 	model:SetAttribute("Code", code)
 	return model

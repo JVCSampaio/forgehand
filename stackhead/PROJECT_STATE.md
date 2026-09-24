@@ -7,53 +7,55 @@ stacked on their head. Taller stacks pay a bigger multiplier at the central bank
 but wobble (simulated on the server from real movement) can topple the stack,
 scattering the items as free loot. Design: `docs/DESIGN.md`. Economy: `docs/ECONOMY.md`.
 
-## Implemented (vertical slice / MVP)
+## Implemented
 
-- World generated from config: bank + 4 ring zones, decorations, spawns, boundary, lighting, leaderboard board
-- 20 items in 4 tiers + Shiny/Golden rarities; zone respawns; loose loot with expiry; item rain
-- Server-authoritative core loop: proximity pickups, wobble, collapse, banking, dash bumps, glue
-- Upgrades: Speed, Reach, Balance, Strength (zone gate)
-- Persistence: session-locked DataStore wrapper, retries, autosave, BindToClose, schema version + sanitize, Studio in-memory fallback
-- Daily streak, stack-record milestones + titles, discovery collection
-- Monetization: 4 passes, 6 dev products, idempotent receipts, Premium perks (all ids = 0 until created)
-- Analytics: onboarding funnel, economy, progression and custom events
-- Client: stack renderer (BulkMoveTo, lean spring), pickup/fall/bank effects, HUD, upgrade/shop menus, contextual guide, dash/glue input (touch, keyboard, gamepad), audio with placeholder engine sounds
-- Tooling: 45 Lune unit tests, economy pacing sim, place structure verifier, CI workflow
+- **4 worlds** (Stackville, Frostpeak, Candy Coast, Neon City), each an island with a bank and 4 rings; global tiers 1–16; every 4th Strength level opens a world; travel via WORLDS panel (validated), return to last world on respawn/rejoin
+- Code-generated maps: `src/server/World/Kit.luau` (floors, radial streets, bank, signs, water, obstacle map) + `Props.luau` + one theme per world
+- 68 items; Shiny/Golden rarities; zone respawns; loose loot; Item Rain; Golden Hour
+- Server-authoritative core loop: pickups, wobble, collapse, banking, dash bumps, glue
+- Upgrades: Speed, Reach, Balance (40 levels), Strength (16 levels, costs calibrated by the sim)
+- Daily streak, **3 daily orders** (TASKS panel), stack records to 999, 204-entry collection
+- **Stack bases** (12 cosmetics under the stack, earned or bought), shop with starter pack, passes, products
+- Persistence: session-locked DataStore, retries, autosave, BindToClose, schema v2 + sanitize
+- Analytics funnel + economy/progression/custom events
+- Client: stack renderer (bases, lean), effects, HUD, menus (Upgrades, Worlds, Tasks, Shop), guide, per-world lighting + snow, input for touch/keyboard/gamepad
+- StreamingEnabled with atomic item models
+- Tooling: 58 Lune tests, pacing sim with cost calibration, place verifier, **visual preview** (`tools/preview/run.sh`), **marketing art** (`tools/art/run.sh` → `marketing/`)
 
 ## Verified
 
-Clean luau-lsp typecheck with Roblox definitions, unit tests, pacing sim, `rojo build`
-and place verification. World/item generators executed in Lune's Roblox DOM and
-rendered with `tools/preview` (fixed inverted wedge roofs, ring-floor z-fighting,
-hidden zone borders, items sunk into raised floors). **Not yet run inside Roblox Studio.**
+Clean luau-lsp typecheck (Roblox definitions), unit tests, pacing sim, `rojo build`,
+place verification, and visual inspection of every world rendered from the real
+generators. **Not yet run inside Roblox Studio.**
 
 ## Current task
 
-First Studio playtest of the MVP (see Next tasks #1).
+First Studio playtest (see Next tasks #1).
 
 ## Known issues
 
 - Never executed in the engine: expect small runtime issues on first playtest.
-- Sounds are engine placeholders (`rbxasset://sounds/...`); replace with licensed Creator Store audio.
-- Speed hacks below 1.8× walk speed are not detected (pickups only skip clear teleports).
-- Leaderboard names use `GetNameFromUserIdAsync`, uncached across servers.
+- Sounds are engine placeholders; replace with licensed Creator Store audio.
+- Speed hacks below 1.8× walk speed are not detected.
+- All four worlds are built at server start (~12k map parts); streaming keeps clients light, server memory untested at scale.
 - Hats/accessories can clip into the first stacked item.
-- No settings menu (music/SFX toggles exist in save data but not in UI).
+- No settings menu (music/SFX toggles exist in save data only).
 
 ## Next tasks
 
-1. Studio: `rojo build` → open `build/Stackhead.rbxl` → Play; fix console errors; test with 2–3 players (Test → Clients and Servers) for bumps, loose loot, rain.
-2. Tune `GameConfig.Wobble` by feel; keep `tools/economy_sim.luau` in sync.
-3. Create passes/products on the Creator Dashboard, paste ids into `MonetizationConfig`.
-4. Replace placeholder sounds; make icon + 2 thumbnails (DESIGN §14).
-5. Settings toggles (SFX/music), reduced-motion option for the camera shake.
-6. Week 1 content: 6 new items (config only).
+1. Studio: `rojo build` → open `build/Stackhead.rbxl` → Play; then Test → Clients and Servers (2–3 players): bumps, loot, rain, travel, orders, bases.
+2. Tune `GameConfig.Wobble` by feel; keep the sim in sync.
+3. Create passes/products on the Creator Dashboard; paste ids into `MonetizationConfig`.
+4. Replace placeholder sounds; upload `marketing/` icon + thumbnails.
+5. Stack Pass (season track tied to orders) — see docs/MONETIZATION.md.
+6. Settings menu (SFX/music, reduced camera shake).
 
 ## Important architecture decisions
 
-- **Rojo + code-generated world**: the whole place is source; the map is built from `GameConfig` at server start.
-- **Pure modules** (`Economy`, `Wobble`, `StackCodec`, `Format`, `PlayerDataSchema`, `SessionStore`, `RateLimiter`, `MemoryStore`) have no Roblox API calls so Lune can test and simulate them. Keep it that way.
-- **Server owns every reward.** Clients only send intent: `Dash`, `UseGlue(bool)`, `ClaimDaily`, `BuyUpgrade(id)`. All rate limited and validated.
+- **Rojo + code-generated worlds**: the whole place is source; maps are built from `WorldConfig` + theme modules at server start. Worlds sit `WorldConfig.Spacing` apart in one place; `Worlds`/`WorldIndex` answer "which world/zone is this position in".
+- **Global tiers**: item Tier = Strength level needed; zones map 1:1 to tiers across worlds.
+- **Pure modules** (`Economy`, `Wobble`, `Orders`, `Cosmetics`, `Worlds`, `StackCodec`, `Format`, `PlayerDataSchema`, `SessionStore`, `RateLimiter`, `MemoryStore`) have no Roblox API calls so Lune can test and simulate them. Keep it that way.
+- **Server owns every reward.** Clients only send intent: `Dash`, `UseGlue(bool)`, `ClaimDaily`, `BuyUpgrade(id)`, `Travel(worldId)`, `ClaimOrder(i)`, `EquipCosmetic(id)`. All rate limited and validated.
 - **Stacks replicate as a string attribute** (`Player.Stack`, codes like `pigg`), rendered client-side; nothing physical is welded to characters.
 - **Loose/rain items** carry `DropFrom`/`DropAt` attributes; clients animate the fall, server blocks pickup until `DropAt`.
 - **Session lock**: a profile can be written only by the server holding its lock; released profiles can't be re-locked by late autosaves.

@@ -54,7 +54,21 @@ function EventService.startRain(byName: string?)
 	end
 end
 
+local goldenUntil = 0
+
+-- Golden Hour: shiny/golden chances x5 for everyone. Stacks durations.
+function EventService.startGoldenHour(byName: string?, seconds: number)
+	local now = os.clock()
+	goldenUntil = math.max(goldenUntil, now) + seconds
+	ItemSpawnService.setGlobalBoost(5, goldenUntil)
+	workspace:SetAttribute("GoldenEndsAt", workspace:GetServerTimeNow() + (goldenUntil - now))
+	broadcast(if byName then string.format("✨ %s started GOLDEN HOUR for everyone! 5x rare items!", byName) else "✨ GOLDEN HOUR! 5x rare items!")
+end
+
 function EventService.init()
+	MonetizationService.setGoldenHourHandler(function(player, seconds)
+		EventService.startGoldenHour(player.DisplayName, seconds)
+	end)
 	MonetizationService.setRainHandler(function(player)
 		EventService.startRain(player.DisplayName)
 	end)
