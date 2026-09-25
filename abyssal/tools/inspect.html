@@ -1,0 +1,60 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Asset inspector</title>
+<style>html,body{margin:0;background:#15171b;overflow:hidden}canvas{display:block}</style></head>
+<body><canvas id="c"></canvas>
+<script type="module">
+import * as THREE from '../vendor/three.module.min.js';
+import { GLTFLoader } from '../vendor/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from '../vendor/addons/utils/SkeletonUtils.js';
+const q = new URLSearchParams(location.search);
+const W = +(q.get('w') || 900), H = +(q.get('h') || 900);
+const renderer = new THREE.WebGLRenderer({ canvas: c, antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H); renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.shadowMap.enabled = true;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x2a2d33);
+scene.add(new THREE.HemisphereLight(0xbfd0ff, 0x302820, 1.1));
+const key = new THREE.DirectionalLight(0xfff0dd, 2.6); key.position.set(2, 4, 3); key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0005; key.shadow.normalBias = 0.02; key.shadow.camera.left = key.shadow.camera.bottom = -2.5; key.shadow.camera.right = key.shadow.camera.top = 2.5; scene.add(key);
+const rim = new THREE.DirectionalLight(0x88aaff, 1.4); rim.position.set(-3, 2, -3); scene.add(rim);
+const ground = new THREE.Mesh(new THREE.CircleGeometry(3, 48), new THREE.MeshStandardMaterial({ color: 0x3a3a3e, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const models = (q.get('m') || 'assets/models/_test.glb').split(',');
+const anim = q.get('anim'); const tnorm = +(q.get('t') || 0);
+const yaws = (q.get('yaw') || '0').split(',').map(Number);
+const loader = new GLTFLoader();
+const focus = (q.get('focus') || '0,0.9,0').split(',').map(Number);
+const dist = +(q.get('dist') || 3.2);
+const elev = +(q.get('elev') || 10);
+const cam = new THREE.PerspectiveCamera(+(q.get('fov') || 30), W / H, 0.05, 50);
+const iso = q.get('iso');
+const ocam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
+Promise.all(models.map((m) => loader.loadAsync('../' + m))).then((gls) => {
+  const n = yaws.length * gls.length; let k = 0;
+  for (const gl of gls) for (const yaw of yaws) {
+    const root = SkeletonUtils.clone(gl.scene);
+    root.traverse((o) => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; if (o.material) o.material.vertexColors = !!o.geometry.attributes.color; } });
+    const tints = Object.fromEntries((q.get('tint') || '').split(',').filter(Boolean).map((t) => t.split(':')));
+    root.traverse((o) => { if (o.isMesh) for (const m of [].concat(o.material)) if (tints[m.name]) { m.color.set('#' + tints[m.name]); } });
+    const hide = (q.get('hide') || '').split(',').filter(Boolean);
+    const show = q.get('show') ? q.get('show').split(',') : null;
+    root.traverse((o) => { if (o.isMesh && (hide.includes(o.name) || (show && !show.includes(o.name) && !show.includes(o.parent?.name)))) o.visible = false; });
+    root.rotation.y = yaw * Math.PI / 180;
+    root.position.x = (k - (n - 1) / 2) * +(q.get('spacing') || 0.8); k++;
+    scene.add(root);
+    if (anim) {
+      const clip = gl.animations.find((a) => a.name === anim);
+      if (clip) { const mx = new THREE.AnimationMixer(root); const a = mx.clipAction(clip); a.play(); mx.setTime(clip.duration * tnorm); }
+      root.userData.anim = true;
+    }
+  }
+  window.clips = gls.map((g) => g.animations.map((a) => a.name + ':' + a.duration.toFixed(2)));
+  window.info = gls.map((g) => { const r = []; g.scene.traverse((o) => { if (o.isMesh) r.push(o.name + '/' + o.geometry.index.count / 3); }); return r; });
+  const e = elev * Math.PI / 180;
+  const camera = iso ? ocam : cam;
+  if (iso) { const s = +iso; ocam.left = -s; ocam.right = s; ocam.top = s; ocam.bottom = -s; ocam.updateProjectionMatrix(); }
+  camera.position.set(focus[0], focus[1] + Math.sin(e) * dist, focus[2] + Math.cos(e) * dist);
+  if (q.get('side')) camera.position.set(focus[0] + dist, focus[1] + Math.sin(e) * dist, focus[2]);
+  camera.lookAt(focus[0], focus[1], focus[2]);
+  renderer.render(scene, camera);
+  window.done = true;
+}).catch((e) => { document.body.innerHTML = '<pre style="color:red">' + e.stack + '</pre>'; window.done = true; });
+</script></body></html>
