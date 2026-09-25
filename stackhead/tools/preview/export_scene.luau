@@ -172,6 +172,9 @@ local Services = game:GetService("ServerScriptService").Server.Services
 local Shared = game:GetService("ReplicatedStorage").Shared
 
 host.require(Services.WorldService).init()
+for _, world in host.require(Shared.WorldIndex).list do
+	host.require(Services.WorldService).ensure(world)
+end
 local ItemSpawnService = host.require(Services.ItemSpawnService)
 ItemSpawnService.init()
 local ItemBuilder = host.require(Shared.ItemBuilder)
@@ -243,17 +246,42 @@ local function randomStack(tiers, count, seed)
 	return codes
 end
 
-local noob = { skin = roblox.Color3.fromRGB(245, 205, 48), torso = roblox.Color3.fromRGB(13, 105, 172), legs = roblox.Color3.fromRGB(40, 127, 71) }
-local red = { skin = roblox.Color3.fromRGB(234, 184, 146), torso = roblox.Color3.fromRGB(196, 40, 28), legs = roblox.Color3.fromRGB(27, 42, 53) }
-local purple = { skin = roblox.Color3.fromRGB(160, 95, 53), torso = roblox.Color3.fromRGB(107, 50, 124), legs = roblox.Color3.fromRGB(99, 95, 98) }
-local white = { skin = roblox.Color3.fromRGB(255, 204, 153), torso = roblox.Color3.fromRGB(242, 243, 243), legs = roblox.Color3.fromRGB(52, 88, 150) }
+local noob = {
+	skin = roblox.Color3.fromRGB(245, 205, 48),
+	torso = roblox.Color3.fromRGB(13, 105, 172),
+	legs = roblox.Color3.fromRGB(40, 127, 71),
+}
+local red = {
+	skin = roblox.Color3.fromRGB(234, 184, 146),
+	torso = roblox.Color3.fromRGB(196, 40, 28),
+	legs = roblox.Color3.fromRGB(27, 42, 53),
+}
+local purple = {
+	skin = roblox.Color3.fromRGB(160, 95, 53),
+	torso = roblox.Color3.fromRGB(107, 50, 124),
+	legs = roblox.Color3.fromRGB(99, 95, 98),
+}
+local white = {
+	skin = roblox.Color3.fromRGB(255, 204, 153),
+	torso = roblox.Color3.fromRGB(242, 243, 243),
+	legs = roblox.Color3.fromRGB(52, 88, 150),
+}
 
 local labels = {}
 local function actor(name, position, yaw, colors, codes, lean)
 	local _, head = avatar(name, position, yaw, colors)
 	if codes and #codes > 0 then
 		local top, count = stackOn(head, codes, lean or roblox.Vector2.zero)
-		table.insert(labels, { text = tostring(count), x = top.X, y = top.Y + 2.2, z = top.Z, color = if name == "Hero" then "#ffdc50" else "#ffffff" })
+		table.insert(
+			labels,
+			{
+				text = tostring(count),
+				x = top.X,
+				y = top.Y + 2.2,
+				z = top.Z,
+				color = if name == "Hero" then "#ffdc50" else "#ffffff",
+			}
+		)
 	end
 end
 
@@ -268,7 +296,14 @@ for _, world in WorldIndex.list do
 		return o + roblox.Vector3.new(x, y, z)
 	end
 	actor("Hero", at(0, 0.4, 44), 0, noob, randomStack({ t }, 28, 7 + t), roblox.Vector2.new(0.05, 0.22))
-	actor("Tower", at(-26, 0.3, 104), 150, purple, randomStack({ t, t + 1 }, 85, 11 + t), roblox.Vector2.new(-0.55, 0.35))
+	actor(
+		"Tower",
+		at(-26, 0.3, 104),
+		150,
+		purple,
+		randomStack({ t, t + 1 }, 85, 11 + t),
+		roblox.Vector2.new(-0.55, 0.35)
+	)
 	actor("Bumper", at(-18, 0.3, 96), 120, red, randomStack({ t }, 4, 3 + t), roblox.Vector2.zero)
 	actor("Banker", at(6, 0.61, -4), 30, white, randomStack({ t, t + 1 }, 16, 21 + t), roblox.Vector2.new(0.1, 0))
 	local collapseAt = at(34, 0.4, 30)
@@ -280,8 +315,9 @@ for _, world in WorldIndex.list do
 		local h = ItemBuilder.definition(code).Height
 		ItemBuilder.pivot(
 			model,
-			roblox.CFrame.new(collapseAt + roblox.Vector3.new(math.cos(angle) * dist, h / 2 + 0.1, math.sin(angle) * dist))
-				* roblox.CFrame.Angles(0.4 * (i % 3), angle, 0.3 * (i % 2))
+			roblox.CFrame.new(
+				collapseAt + roblox.Vector3.new(math.cos(angle) * dist, h / 2 + 0.1, math.sin(angle) * dist)
+			) * roblox.CFrame.Angles(0.4 * (i % 3), angle, 0.3 * (i % 2))
 		)
 		model.Parent = actors
 	end
@@ -302,8 +338,25 @@ for _, inst in Workspace:GetDescendants() do
 			n = inst.Name,
 			s = if inst:IsA("Part") then inst.Shape.Name else "Block",
 			z = { round(inst.Size.X), round(inst.Size.Y), round(inst.Size.Z) },
-			m = { round(x), round(y), round(z), round(r00), round(r01), round(r02), round(r10), round(r11), round(r12), round(r20), round(r21), round(r22) },
-			k = { math.floor(inst.Color.R * 255 + 0.5), math.floor(inst.Color.G * 255 + 0.5), math.floor(inst.Color.B * 255 + 0.5) },
+			m = {
+				round(x),
+				round(y),
+				round(z),
+				round(r00),
+				round(r01),
+				round(r02),
+				round(r10),
+				round(r11),
+				round(r12),
+				round(r20),
+				round(r21),
+				round(r22),
+			},
+			k = {
+				math.floor(inst.Color.R * 255 + 0.5),
+				math.floor(inst.Color.G * 255 + 0.5),
+				math.floor(inst.Color.B * 255 + 0.5),
+			},
 			t = round(inst.Transparency),
 			r = round(inst.Reflectance),
 			mat = inst.Material.Name,

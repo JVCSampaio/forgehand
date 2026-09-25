@@ -146,7 +146,13 @@ end
 
 -- Loose items: fall from `from` and land at `groundPosition` at `readyAt`
 -- (server clock). Clients animate the fall using the DropFrom / DropAt attributes.
-function ItemSpawnService.spawnLoose(code: string, from: Vector3, groundPosition: Vector3, owner: number?, zone: string?): Model?
+function ItemSpawnService.spawnLoose(
+	code: string,
+	from: Vector3,
+	groundPosition: Vector3,
+	owner: number?,
+	zone: string?
+): Model?
 	local def = ItemBuilder.definition(code)
 	if not def then
 		return nil
@@ -184,7 +190,13 @@ function ItemSpawnService.spawnRainDrop(world, rarityBoost: number): Model?
 	end
 	local def = pickItem(zone.Tier)
 	local code = StackCodec.code(def.Id, rollRarity(rarityBoost))
-	return ItemSpawnService.spawnLoose(code, spot + Vector3.new(0, GameConfig.Events.ItemRain.DropHeight, 0), spot, nil, zone.Key)
+	return ItemSpawnService.spawnLoose(
+		code,
+		spot + Vector3.new(0, GameConfig.Events.ItemRain.DropHeight, 0),
+		spot,
+		nil,
+		zone.Key
+	)
 end
 
 -- Items whose root parts are within `radius` of `position`.
@@ -239,8 +251,8 @@ function ItemSpawnService.init()
 	overlapParams.FilterType = Enum.RaycastFilterType.Include
 	overlapParams.FilterDescendantsInstances = { itemsFolder }
 
-	-- Fill every zone of every world at start so no world ever looks empty.
-	for _, world in WorldIndex.list do
+	-- Build and populate additional worlds only when first visited.
+	local function fill(world)
 		for _, zone in world.Zones do
 			zoneCounts[zone.Key] = 0
 			for _ = 1, zone.MaxItems do
@@ -249,10 +261,20 @@ function ItemSpawnService.init()
 		end
 	end
 
+	WorldService.onBuilt(fill)
+	for _, world in WorldIndex.list do
+		if WorldService.kit(world.Id) then
+			fill(world)
+		end
+	end
+
 	task.spawn(function()
 		while true do
 			task.wait(GameConfig.Spawning.RespawnInterval)
 			for _, world in WorldIndex.list do
+				if not WorldService.kit(world.Id) then
+					continue
+				end
 				for _, zone in world.Zones do
 					for _ = 1, GameConfig.Spawning.RespawnBatch do
 						if (zoneCounts[zone.Key] or 0) < zone.MaxItems then
@@ -275,7 +297,6 @@ function ItemSpawnService.init()
 			end
 		end
 	end)
-
 end
 
 return ItemSpawnService

@@ -60,19 +60,19 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
+renderer.toneMappingExposure = 0.88;
 document.body.prepend(renderer.domElement);
 
 const world = new THREE.Scene();
 const pmrem = new THREE.PMREMGenerator(renderer);
 world.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-world.environmentIntensity = 0.55;
+world.environmentIntensity = 0.38;
 
 const WORLD_X = { Stackville: 0, Frostpeak: 2400, CandyCoast: 4800, NeonCity: 7200 };
 const LOOKS = {
-  Stackville: { sky: ['#2f86e8', '#8cc8f5', '#e8f4fb'], fog: 0xcfe6f7, sun: 0xfff0d8, sunI: 3.0, hemi: [0xdfeeff, 0x8a7a66, 1.1] },
-  Frostpeak: { sky: ['#4a8fe0', '#b8d8f6', '#f2f7fc'], fog: 0xe6f0fa, sun: 0xfff8ef, sunI: 3.0, hemi: [0xeef6ff, 0x9aa6b8, 1.2] },
-  CandyCoast: { sky: ['#ff7fbf', '#ffc0dc', '#fff2e2'], fog: 0xffe2ef, sun: 0xfff0f6, sunI: 2.8, hemi: [0xfff0f8, 0xc08aa6, 1.2] },
+  Stackville: { sky: ['#2f86e8', '#8cc8f5', '#e8f4fb'], fog: 0xcfe6f7, sun: 0xfff0d8, sunI: 2.2, hemi: [0xdfeeff, 0x8a7a66, 1.1] },
+  Frostpeak: { sky: ['#4a8fe0', '#b8d8f6', '#f2f7fc'], fog: 0xe6f0fa, sun: 0xfff8ef, sunI: 2.2, hemi: [0xeef6ff, 0x9aa6b8, 1.2] },
+  CandyCoast: { sky: ['#ff7fbf', '#ffc0dc', '#fff2e2'], fog: 0xffe2ef, sun: 0xfff0f6, sunI: 2.0, hemi: [0xfff0f8, 0xc08aa6, 1.2] },
   NeonCity: { sky: ['#140c38', '#4d2a86', '#e2589a'], fog: 0x3a2466, sun: 0xff9ad0, sunI: 1.2, hemi: [0x9a80e0, 0x2a1840, 1.0] },
 };
 
@@ -154,7 +154,7 @@ function addWorld(name, center, maxDist, clear = []) {
     if (p.a) continue;
     const [x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22] = p.m;
     if (name === 'Stackville' && Math.hypot(x - 26.9, z - 26.9) < 9) continue;
-    if (Math.max(p.z[0], p.z[1], p.z[2]) < 60 && clear.some(([a, b, r]) => segDist(new THREE.Vector3(x, y, z), a, b) < r + Math.min(p.z[0], p.z[1], p.z[2]) / 2)) continue;
+    if (Math.max(p.z[0], p.z[1], p.z[2]) < 60 && clear.some(([a, b, r]) => segDist(new THREE.Vector3(x, 0, z), new THREE.Vector3(a.x, 0, a.z), new THREE.Vector3(b.x, 0, b.z)) < r + Math.min(p.z[0], p.z[1], p.z[2]) / 2)) continue;
     if (Math.abs(x - x0) > 1200 && !(p.z[0] > 2000)) continue;
     const big = p.z[0] > 300 || p.z[2] > 300;
     if (!big && Math.hypot(x - center.x, z - center.z) > maxDist) continue;
@@ -249,7 +249,7 @@ function buildStack(anchor, codes, lean, baseId) {
     cf.multiply(new THREE.Matrix4().makeTranslation(0, h, 0));
   };
   if (baseId) { const b = baseGroup(baseId); place(b.group, b.height, 0); }
-  items.forEach((it, i) => place(it.group, it.height, THREE.MathUtils.degToRad(((i + 1) * 137) % 60 - 30)));
+  items.forEach((it, i) => place(it.group, it.height, (SHOT === 'panel' ? 0 : Math.PI) + (codes[i].startsWith('car') ? .65 : 0) + THREE.MathUtils.degToRad(((i + 1) * 137) % 60 - 30)));
   return new THREE.Vector3().setFromMatrixPosition(cf);
 }
 
@@ -292,9 +292,9 @@ function faceTexture(kind) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
-function avatar({ pos, yaw = 0, skin = [255, 205, 60], shirt = [30, 110, 200], pants = [40, 130, 70], face = 'grin', pose = 'carry' }) {
+function avatar({ pos, yaw = 0, skin = [255, 205, 60], shirt = [30, 110, 200], pants = [40, 130, 70], face = 'grin', pose = 'carry', scale = 1 }) {
   const root = new THREE.Group();
-  root.position.copy(pos); root.rotation.y = yaw;
+  root.position.copy(pos); root.rotation.y = yaw; root.scale.setScalar(scale);
   const box = (w, h, d, color, x, y, z, mat = 'SmoothPlastic') => {
     const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, 0.12), material(color, mat));
     m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; return m;
@@ -358,7 +358,7 @@ function html(tag, cls, text, style) { const e = document.createElement(tag); e.
 function project(camera, v) { const p = v.clone().project(camera); return [(p.x + 1) / 2 * W, (1 - p.y) / 2 * H]; }
 
 // ---------------------------------------------------------------- post
-function render(camera, { focus, aperture = 0.00012, bloom = 0.35, dof = true, ao = true }) {
+function render(camera, { focus, aperture = 0.00012, bloom = 0.12, dof = true, ao = false }) {
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(world, camera));
   if (ao) {
@@ -391,59 +391,35 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 // ---------------------------------------------------------------- shots
 const SHOTS = {
   tower() {
-    const o = WORLD_X.Stackville;
-    setupLook('Stackville', V(o, 20, 60), 120);
-    const hero = V(o + 1, 0.45, 70);
-    const camPos = hero.clone().add(V(9.5, 3.6, 15.5));
-    addWorld('Stackville', V(o, 0, 60), 420, [[camPos, hero.clone().add(V(0, 20, 0)), 6]]);
-    const top = avatar({ pos: hero, yaw: 0.55, face: 'grin' });
-    const codes = [...randomCodes([1, 2, 3, 4], 64, 5, 0.12)];
-    codes.splice(30, 0, 'pigg', 'carg'); codes.splice(22, 0, 'dkkg'); codes.splice(12, 0, 'chsg'); codes.splice(5, 0, 'dck');
-    const stackTop = buildStack(top, codes, [-1.6, 0.35], 'gold');
-    avatar({ pos: V(o - 14, 0.45, 52), yaw: 1.2, shirt: [200, 40, 40], pants: [30, 40, 60], skin: [234, 184, 146], face: 'smile' });
-    buildStack(V(o - 14, 5.75, 52), randomCodes([1, 2], 14, 9), [0.2, 0.05], 'pizza');
-    avatar({ pos: V(o + 20, 0.45, 44), yaw: -0.4, shirt: [110, 60, 170], pants: [60, 60, 70], skin: [160, 95, 53], face: 'smile' });
-    buildStack(V(o + 20, 5.75, 44), randomCodes([1], 9, 3), [0, 0.1], 'plate');
-    sparkles(top.clone().add(V(-4, 22, 0)), 26, 16);
-    const cam = cameraAt(camPos, hero.clone().add(V(-4, 13.5, -2)), 64);
-    render(cam, { focus: 18.5, aperture: 0.00018 });
-    html('div', 'logo', 'STACKHEAD', { left: '70px', top: '50px' });
-    html('div', 'logo-sub', 'STACK EVERYTHING!', { left: '96px', top: '225px' });
-    const [bx, by] = project(cam, top.clone().add(V(-2.5, 26, 0)));
-    html('div', 'bubble', '📦 ' + codes.length, { left: Math.min(W - 200, bx + 240) + 'px', top: Math.max(360, by) + 'px' });
-    html('div', 'sticker', 'HOW HIGH<br>CAN YOU GO?', { right: '70px', bottom: '70px', fontSize: '64px', textAlign: 'center' });
+    const hero = V(3, 0.45, 70), camPos = V(6, 8, 92);
+    setupLook('Stackville', V(0, 8, 70), 90);
+    addWorld('Stackville', V(0, 0, 60), 320, [[camPos, V(0, 8, 70), 8]]);
+    const top = avatar({pos:hero, yaw:0.12, face:'wow', scale:1.5});
+    buildStack(top, ['piz','car','pig','dck','apl'], [-0.6,0.1], 'pizza');
+    const rival = avatar({pos:V(-6,0.45,68), yaw:0.45, face:'grin', shirt:[230,65,85], pose:'run'});
+    buildStack(rival,['piz','apl'],[0.05,0],'plate');
+    const cam = cameraAt(camPos,V(0,7.8,70),43);
+    render(cam,{focus:22,dof:true,aperture:.00013,bloom:0.1});
+    html('div','logo','ONE MORE?',{left:'75px',top:'65px',fontSize:'126px'});
+    html('div','tag','STACKHEAD',{left:'80px',bottom:'60px',fontSize:'48px'});
   },
   crash() {
-    const o = WORLD_X.Stackville;
-    setupLook('Stackville', V(o, 15, 60), 120);
-    const camPos = V(o + 7, 6, 86);
-    addWorld('Stackville', V(o, 0, 60), 420, [[camPos, V(o, 10, 66), 4]]);
-    const top = avatar({ pos: V(o, 0.45, 66), yaw: 0.3, face: 'wow', pose: 'panic' });
-    const codes = randomCodes([1, 2, 3, 4], 60, 21, 0.14);
-    const standing = codes.slice(0, 14);
-    const mid = buildStack(top, standing, [1.4, 0.3], 'cushion');
-    // The rest explodes outward and falls.
-    let seed = 7;
-    const rnd = () => { seed = (seed * 48271) % 2147483647; return seed / 2147483647; };
-    codes.slice(14).forEach((code, i) => {
-      const it = itemGroup(code);
-      const t = i / 46;
-      const angle = rnd() * Math.PI * 2;
-      const out = 3 + t * 16 + rnd() * 5;
-      const p = mid.clone().add(V(Math.cos(angle) * out, 6 + t * 26 - out * 0.35 + rnd() * 6, Math.sin(angle) * out * 0.7));
-      it.group.position.copy(p);
-      it.group.rotation.set(rnd() * 6, rnd() * 6, rnd() * 6);
-      world.add(it.group);
+    const hero = V(-2,0.45,70), camPos=V(3,8,91);
+    setupLook('Stackville',V(0,8,70),90);
+    addWorld('Stackville',V(0,0,60),320,[[camPos,V(0,8,70),8]]);
+    const top=avatar({pos:hero,yaw:0.1,face:'wow',pose:'panic',scale:1.5});
+    const mid=buildStack(top,['piz','can','pig'],[-0.85,0.15],'pizza');
+    avatar({pos:V(3,0.45,71),yaw:-0.4,shirt:[225,48,75],pants:[45,40,75],face:'grin',pose:'run',scale:1.3});
+    // The approaching rival and scattered objects carry the action clearly.
+    ['car','dck','apl','can','piz'].forEach((code,i)=>{
+      const it=itemGroup(code);
+      it.group.position.copy(V(-3+i*2.1,12+Math.sin(i*.75)*2,70));
+      it.group.rotation.set(.15+i*.3,Math.PI+.2+i*.4,-.3+i*.3);world.add(it.group);
     });
-    sparkles(mid.clone().add(V(0, 8, 0)), 40, 22, 0xffe070);
-    const bumper = V(o + 6, 0.45, 69);
-    avatar({ pos: bumper, yaw: -1.2, shirt: [220, 50, 50], pants: [30, 30, 40], skin: [234, 184, 146], face: 'grin', pose: 'run' });
-    speedLines(bumper, V(-1, 0, -0.35).normalize(), 12);
-    const cam = cameraAt(camPos, V(o + 1, 15.5, 63), 62);
-    render(cam, { focus: 21 });
-    html('div', 'logo', 'STACKHEAD', { left: '70px', top: '50px', fontSize: '130px' });
-    html('div', 'sticker', "DON'T DROP IT!", { right: '70px', bottom: '80px', fontSize: '80px' });
-    html('div', 'tag', '💥 BUMPED!', { left: project(cam, bumper.clone().add(V(0, 8, 0)))[0] - 120 + 'px', top: project(cam, bumper.clone().add(V(0, 8, 0)))[1] - 60 + 'px' });
+    const cam=cameraAt(camPos,V(0,7.8,70),45);
+    render(cam,{focus:21,dof:true,aperture:.00013,bloom:0.1});
+    html('div','logo','UH OH!',{left:'75px',top:'70px',fontSize:'140px'});
+    html('div','tag','STACKHEAD',{left:'80px',bottom:'60px',fontSize:'48px'});
   },
   panel() {
     const name = params.get('world');
@@ -452,10 +428,10 @@ const SHOTS = {
     const bases = { Stackville: 'pizza', Frostpeak: 'snow', CandyCoast: 'donut', NeonCity: 'holo' };
     setupLook(name, V(o, 20, 80), 140);
     addWorld(name, V(o, 0, 100), 700, [[V(o + 2.5, 5, 22), V(o, 8, 44), 3]]);
-    const top = avatar({ pos: V(o, 0.45, 44), yaw: Math.PI * 0.95, face: 'grin' });
-    buildStack(top, randomCodes(tiers, 46, o + 3, 0.12), [0.9, -0.3], bases[name]);
-    const cam = cameraAt(V(o + 2.5, 5, 22), V(o - 1, 21, 100), 62);
-    render(cam, { focus: 22, bloom: name === 'NeonCity' ? 0.6 : 0.35 });
+    const top = avatar({ pos: V(o, 0.45, 44), yaw: Math.PI * 0.95, face: name === 'Frostpeak' ? 'wow' : 'grin', pose: name === 'NeonCity' ? 'run' : 'carry', scale: 1.4 });
+    buildStack(top, randomCodes(tiers, 10, o + 3, 0.12), [0.9, -0.3], bases[name]);
+    const cam = cameraAt(V(o + 2.5, 5, 22), V(o - 1, 11, 100), 52);
+    render(cam, { focus: 22, bloom: name === 'NeonCity' ? 0.22 : 0.1 });
   },
   // Every item on a pedestal grid, labelled — for reviewing model quality.
   gallery() {
@@ -489,18 +465,13 @@ const SHOTS = {
     }
   },
   icon() {
-    const o = WORLD_X.Stackville;
-    setupLook('Stackville', V(o, 20, 60), 80);
-    const hero = V(o, 0.45, 70);
-    const camPos = hero.clone().add(V(4.6, 5.4, 9.4));
-    addWorld('Stackville', V(o, 0, 60), 300, [[camPos, hero.clone().add(V(0, 5, 0)), 3]]);
-    const top = avatar({ pos: hero, yaw: 0.45, face: 'grin' });
-    const codes = randomCodes([1, 2, 3, 4], 30, 12, 0.18);
-    codes.splice(6, 0, 'pigg');
-    codes.splice(3, 0, 'carg');
-    buildStack(top, codes, [-1.1, 0.2], 'gold');
-    const cam = cameraAt(camPos, hero.clone().add(V(-1.6, 8.6, 0)), 66);
-    render(cam, { focus: 10, aperture: 0.00035 });
+    const hero=V(0,0.45,70), camPos=V(1,9.4,83);
+    setupLook('Stackville',V(0,8,70),60);
+    world.background=skyTexture(['#195cc7','#299ccc','#72d4ed']);
+    const top=avatar({pos:hero,yaw:.08,face:'wow',pose:'panic',scale:1.5});
+    buildStack(top,['car','pig','dck'],[-.38,.05],'pizza');
+    const cam=cameraAt(camPos,V(-.3,9.2,70),46);
+    render(cam,{dof:false,bloom:.08,ao:true});
   },
 };
 

@@ -46,6 +46,12 @@
         },
         "EquipCosmetic": {
           "$className": "RemoteEvent"
+        },
+        "SetSteady": {
+          "$className": "RemoteEvent"
+        },
+        "SetSetting": {
+          "$className": "RemoteEvent"
         }
       }
     },

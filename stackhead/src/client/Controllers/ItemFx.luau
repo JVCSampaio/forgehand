@@ -156,7 +156,43 @@ local function updateFlights()
 	end
 end
 
+local function reducedMotion(): boolean
+	local data = ClientState.Data
+	return game:GetService("GuiService").ReducedMotionEnabled
+		or (data ~= nil and data.Settings and data.Settings.ReducedMotion == true)
+end
+
+local function crashBurst(origin: Vector3, lost: number)
+	local camera = Workspace.CurrentCamera
+	if not camera or (camera.CFrame.Position - origin).Magnitude > 250 then
+		return
+	end
+	local anchor = Instance.new("Part")
+	anchor.Anchored = true
+	anchor.CanCollide, anchor.CanQuery, anchor.CanTouch = false, false, false
+	anchor.Transparency = 1
+	anchor.Position = origin + Vector3.new(0, 6, 0)
+	local burst = Instance.new("ParticleEmitter")
+	burst.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	burst.Rate = 0
+	burst.Lifetime = NumberRange.new(0.5, 1.2)
+	burst.Speed = NumberRange.new(12, 30)
+	burst.SpreadAngle = Vector2.new(160, 160)
+	burst.Acceleration = Vector3.new(0, -35, 0)
+	burst.Color = ColorSequence.new(Color3.fromRGB(255, 205, 60), Color3.fromRGB(255, 90, 120))
+	burst.Size = NumberSequence.new(0.8, 0)
+	burst.Parent = anchor
+	anchor.Parent = fxFolder
+	burst:Emit(math.clamp(lost, 8, if reducedMotion() then 16 else 100))
+	game:GetService("Debris"):AddItem(anchor, 2)
+end
+
 local function updateShake()
+	if reducedMotion() then
+		shakeUntil = 0
+		shakeStrength = 0
+		return
+	end
 	local camera = Workspace.CurrentCamera
 	local now = os.clock()
 	if not camera or now > shakeUntil then
@@ -179,7 +215,9 @@ local function spinCoins()
 	local t = os.clock()
 	for coin, base in spinners do
 		if coin.Parent then
-			coin.CFrame = CFrame.new(base + Vector3.new(0, math.sin(t * 1.5) * 0.8, 0)) * CFrame.Angles(0, t * 1.2, 0) * CFrame.Angles(0, 0, math.rad(90))
+			coin.CFrame = CFrame.new(base + Vector3.new(0, math.sin(t * 1.5) * 0.8, 0))
+				* CFrame.Angles(0, t * 1.2, 0)
+				* CFrame.Angles(0, 0, math.rad(90))
 		else
 			spinners[coin] = nil
 		end
@@ -275,6 +313,7 @@ function ItemFx.init()
 			return
 		end
 		Audio.play("Collapse", 1, origin)
+		crashBurst(origin, lost or 1)
 		if userId == localPlayer.UserId then
 			ItemFx.shake(math.clamp((lost or 1) * 0.06, 0.6, 2.5), 0.6)
 		end

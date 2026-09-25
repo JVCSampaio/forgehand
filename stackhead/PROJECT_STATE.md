@@ -20,7 +20,7 @@ scattering the items as free loot. Design: `docs/DESIGN.md`. Economy: `docs/ECON
 - Analytics funnel + economy/progression/custom events
 - Client: stack renderer (bases, lean), effects, HUD, menus (Upgrades, Worlds, Tasks, Shop), guide, per-world lighting + snow, input for touch/keyboard/gamepad
 - StreamingEnabled with atomic item models
-- Tooling: 60 Lune tests, pacing sim with cost calibration, place verifier, **visual preview** (`tools/preview/run.sh`), **marketing art** (`tools/art/run.sh` → `marketing/`), **item gallery** (`SHOTS=gallery tools/art/run.sh`)
+- Tooling: 66 Lune tests, pacing sim with cost calibration, place verifier, **visual preview** (`tools/preview/run.sh`), **marketing art** (`tools/art/run.sh` → `marketing/`), **item gallery** (`SHOTS=gallery tools/art/run.sh`)
 
 ## Verified
 
@@ -32,27 +32,31 @@ generators. **Not yet run inside Roblox Studio.**
 
 First Studio playtest (see Next tasks #1).
 
-## Known issues
+## September 2026 overhaul
 
-- Never executed in the engine: expect small runtime issues on first playtest.
-- Sounds are engine placeholders; replace with licensed Creator Store audio (the meme pickup wants a rubber-duck honk).
-- Speed hacks below 1.8× walk speed are not detected.
-- All four worlds are built at server start (~12k map parts); streaming keeps clients light, server memory untested at scale.
-- Hats/accessories can clip into the first stacked item.
-- No settings menu (music/SFX toggles exist in save data only).
+See `docs/REVISAO-2026-09.md` for changes, evidence and remaining release gates.
+Steady mode, earlier progression, cosmetic previews, settings, full-height stack
+LOD, movement rollback before rewards, lazy world construction, original audio
+sources and a regenerated marketing campaign are implemented. Audio upload IDs
+and paid catalog IDs are still unset; zero-ID products remain hidden.
 
-## Next tasks
+## Remaining release work
 
-1. Studio: `rojo build` → open `build/Stackhead.rbxl` → Play; then Test → Clients and Servers (2–3 players): bumps, loot, rain, travel, orders, bases.
-2. Tune `GameConfig.Wobble` by feel; keep the sim in sync.
-3. Create passes/products on the Creator Dashboard; paste ids into `MonetizationConfig`.
-4. Replace placeholder sounds; upload `marketing/` icon + thumbnails.
-5. Stack Pass (season track tied to orders) — see docs/MONETIZATION.md.
-6. Settings menu (SFX/music, reduced camera shake).
+1. Open `build/Stackhead.rbxl` in Studio; play solo, then 2–3 clients. Check lag,
+   dash/bump/collapse, steady speed, banking, 999-item towers, mobile portrait and
+   landscape, gamepad menus, accessories, world travel and persisted settings.
+2. Upload `assets/audio/*.wav` to the experience owner; set permitted asset IDs
+   in `src/shared/Config/AudioAssets.luau` and test audible playback. Until then
+   runtime uses engine fallback effects; the original music requires its ID.
+3. Create passes/products and set their IDs in `MonetizationConfig`; verify
+   purchases and receipt retry/save failures in a published test experience.
+4. Upload the new `marketing/` icon and thumbnails; playtest pacing with humans
+   and profile a populated server before release. No live retention or revenue
+   outcome has been measured.
 
 ## Important architecture decisions
 
-- **Rojo + code-generated worlds**: the whole place is source; maps are built from `WorldConfig` + theme modules at server start. Worlds sit `WorldConfig.Spacing` apart in one place; `Worlds`/`WorldIndex` answer "which world/zone is this position in".
+- **Rojo + code-generated worlds**: the whole place is source; maps are built from `WorldConfig` + theme modules on first use. Worlds sit `WorldConfig.Spacing` apart in one place; `Worlds`/`WorldIndex` answer "which world/zone is this position in".
 - **Global tiers**: item Tier = Strength level needed; zones map 1:1 to tiers across worlds.
 - **Pure modules** (`Economy`, `Wobble`, `Orders`, `Cosmetics`, `Worlds`, `StackCodec`, `Format`, `PlayerDataSchema`, `SessionStore`, `RateLimiter`, `MemoryStore`) have no Roblox API calls so Lune can test and simulate them. Keep it that way.
 - **Server owns every reward.** Clients only send intent: `Dash`, `UseGlue(bool)`, `ClaimDaily`, `BuyUpgrade(id)`, `Travel(worldId)`, `ClaimOrder(i)`, `EquipCosmetic(id)`. All rate limited and validated.

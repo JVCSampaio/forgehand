@@ -1,0 +1,80 @@
+{
+  "Pickup": {
+    "file": "Pickup.wav",
+    "seconds": 0.12,
+    "peak_dbfs": -8.5,
+    "asset_id": 0
+  },
+  "Bank": {
+    "file": "Bank.wav",
+    "seconds": 0.58,
+    "peak_dbfs": -8.4,
+    "asset_id": 0
+  },
+  "Upgrade": {
+    "file": "Upgrade.wav",
+    "seconds": 0.5,
+    "peak_dbfs": -8.7,
+    "asset_id": 0
+  },
+  "Error": {
+    "file": "Error.wav",
+    "seconds": 0.19,
+    "peak_dbfs": -11.4,
+    "asset_id": 0
+  },
+  "Collapse": {
+    "file": "Collapse.wav",
+    "seconds": 1.0,
+    "peak_dbfs": -7.6,
+    "asset_id": 0
+  },
+  "Dash": {
+    "file": "Dash.wav",
+    "seconds": 0.2,
+    "peak_dbfs": -13.1,
+    "asset_id": 0
+  },
+  "Bump": {
+    "file": "Bump.wav",
+    "seconds": 0.22,
+    "peak_dbfs": -7.9,
+    "asset_id": 0
+  },
+  "Glue": {
+    "file": "Glue.wav",
+    "seconds": 0.35,
+    "peak_dbfs": -7.5,
+    "asset_id": 0
+  },
+  "Rare": {
+    "file": "Rare.wav",
+    "seconds": 0.5,
+    "peak_dbfs": -8.7,
+    "asset_id": 0
+  },
+  "Meme": {
+    "file": "Meme.wav",
+    "seconds": 0.455,
+    "peak_dbfs": -11.0,
+    "asset_id": 0
+  },
+  "Click": {
+    "file": "Click.wav",
+    "seconds": 0.055,
+    "peak_dbfs": -17.2,
+    "asset_id": 0
+  },
+  "Wobble": {
+    "file": "Wobble.wav",
+    "seconds": 2.0,
+    "peak_dbfs": -21.2,
+    "asset_id": 0
+  },
+  "Music": {
+    "file": "Music.wav",
+    "seconds": 8.0,
+    "peak_dbfs": -11.3,
+    "asset_id": 0
+  }
+}

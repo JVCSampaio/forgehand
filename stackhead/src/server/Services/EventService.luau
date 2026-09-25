@@ -46,7 +46,9 @@ end
 function EventService.startRain(byName: string?)
 	local now = os.clock()
 	rainEndsAt = math.max(rainEndsAt, now) + RAIN.Duration
-	broadcast(if byName then string.format("%s made it RAIN ITEMS for everyone!", byName) else "ITEM RAIN! Grab everything!")
+	broadcast(
+		if byName then string.format("%s made it RAIN ITEMS for everyone!", byName) else "ITEM RAIN! Grab everything!"
+	)
 	if raining then
 		workspace:SetAttribute("RainEndsAt", workspace:GetServerTimeNow() + (rainEndsAt - now))
 	else
@@ -62,7 +64,11 @@ function EventService.startGoldenHour(byName: string?, seconds: number)
 	goldenUntil = math.max(goldenUntil, now) + seconds
 	ItemSpawnService.setGlobalBoost(5, goldenUntil)
 	workspace:SetAttribute("GoldenEndsAt", workspace:GetServerTimeNow() + (goldenUntil - now))
-	broadcast(if byName then string.format("✨ %s started GOLDEN HOUR for everyone! 5x rare items!", byName) else "✨ GOLDEN HOUR! 5x rare items!")
+	broadcast(
+		if byName
+			then string.format("✨ %s started GOLDEN HOUR for everyone! 5x rare items!", byName)
+			else "✨ GOLDEN HOUR! 5x rare items!"
+	)
 end
 
 function EventService.init()
@@ -74,8 +80,11 @@ function EventService.init()
 	end)
 	if RAIN.Interval > 0 then
 		task.spawn(function()
+			local delay = RAIN.FirstRainDelay
 			while true do
-				task.wait(RAIN.Interval)
+				workspace:SetAttribute("NextRainAt", workspace:GetServerTimeNow() + delay)
+				task.wait(delay)
+				delay = RAIN.Interval
 				if #Players:GetPlayers() > 0 then
 					EventService.startRain(nil)
 				end

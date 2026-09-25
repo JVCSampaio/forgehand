@@ -96,6 +96,7 @@ end
 
 local function buildSnapshot(player: Player, profile)
 	local snapshot = {
+		Settings = table.clone(profile.Settings),
 		Coins = profile.Coins,
 		Glue = profile.Glue,
 		Upgrades = table.clone(profile.Upgrades),
@@ -244,6 +245,21 @@ end
 
 function DataService.init()
 	pickStore()
+	local limiter = require(Util.RateLimiter).new(8, 2)
+	Remotes.SetSetting.OnServerEvent:Connect(function(player, key, value)
+		if typeof(key) ~= "string" or typeof(value) ~= "boolean" or not limiter:allow(player) then
+			return
+		end
+		local profile = profiles[player]
+		if not profile or profile.Settings[key] == nil then
+			return
+		end
+		profile.Settings[key] = value
+		DataService.changed(player)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		limiter:forget(player)
+	end)
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	Players.PlayerRemoving:Connect(onPlayerRemoving)
 	for _, player in Players:GetPlayers() do

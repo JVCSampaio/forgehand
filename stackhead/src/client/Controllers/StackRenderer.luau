@@ -13,10 +13,19 @@ local GameConfig = require(Shared.Config.GameConfig)
 local CosmeticConfig = require(Shared.Config.CosmeticConfig)
 local ItemBuilder = require(Shared.ItemBuilder)
 local StackCodec = require(Shared.StackCodec)
+local StackLOD = require(Shared.StackLOD)
 
 local StackRenderer = {}
 
-type RenderItem = { Code: string, Model: Model, Parts: { BasePart }, Offsets: { CFrame }, Height: number, Yaw: CFrame }
+type RenderItem = {
+	Code: string,
+	Model: Model,
+	Parts: { BasePart },
+	Offsets: { CFrame },
+	Height: number,
+	Count: number?,
+	Yaw: CFrame,
+}
 type Render = {
 	Player: Player,
 	Folder: Folder,
@@ -31,6 +40,8 @@ type Render = {
 	Visible: boolean,
 	LastTop: CFrame?,
 	Base: RenderItem?,
+	HeadClearance: number?,
+	Character: Model?,
 }
 
 local localPlayer = Players.LocalPlayer
@@ -77,16 +88,48 @@ local function buildItem(code: string, index: number, isLocal: boolean): RenderI
 	return { Code = code, Model = model, Parts = parts, Offsets = offsets, Height = def.Height, Yaw = yaw }
 end
 
+local function proxyItem(segment, index: number): RenderItem
+	local def = ItemBuilder.definition(segment.Code)
+	local model = Instance.new("Model")
+	model.Name = "TowerSection"
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.CanCollide, part.CanQuery, part.CanTouch = false, false, false
+	part.CastShadow = false
+	part.Size = Vector3.new(1.4 + index % 3 * 0.25, segment.Height, 1.6)
+	local color = def and def.Parts[1].Color or { 180, 160, 100 }
+	part.Color = Color3.fromRGB(color[1], color[2], color[3])
+	part.Parent = model
+	model.PrimaryPart = part
+	return {
+		Code = segment.Code,
+		Model = model,
+		Parts = { part },
+		Offsets = { CFrame.identity },
+		Height = segment.Height,
+		Count = segment.Count,
+		Yaw = CFrame.identity,
+	}
+end
+
 local function sync(render: Render)
 	local codes = StackCodec.decode(render.Player:GetAttribute("Stack") :: string?)
 	local isLocal = render.Player == localPlayer
 	local cap = if isLocal then GameConfig.Render.MaxItemsLocal else GameConfig.Render.MaxItemsOthers
 	render.Count = #codes
+	local plan = StackLOD.plan(codes, function(code)
+		local def = ItemBuilder.definition(code)
+		return if def then def.Height else 0
+	end, cap, GameConfig.Render.ProxySegments)
 
 	-- Keep the common prefix; rebuild only what changed.
 	local keep = 0
-	for i = 1, math.min(#render.Items, #codes) do
-		if render.Items[i].Code ~= codes[i] then
+	for i = 1, math.min(#render.Items, #plan) do
+		if
+			render.Items[i].Code ~= plan[i].Code
+			or render.Items[i].Height ~= plan[i].Height
+			or (render.Items[i].Count or 1) ~= plan[i].Count
+		then
 			break
 		end
 		keep = i
@@ -107,8 +150,8 @@ local function sync(render: Render)
 		end
 	end
 
-	for i = keep + 1, math.min(#codes, cap) do
-		local item = buildItem(codes[i], i, isLocal)
+	for i = keep + 1, #plan do
+		local item = if plan[i].Count > 1 then proxyItem(plan[i], i) else buildItem(plan[i].Code, i, isLocal)
 		if item then
 			item.Model.Parent = render.Folder
 			table.insert(render.Items, item)
@@ -146,7 +189,8 @@ local function syncBase(render: Render)
 		fire.Parent = model.PrimaryPart
 	end
 	model.Parent = render.Folder
-	render.Base = { Code = base.Id, Model = model, Parts = parts, Offsets = offsets, Height = base.Height, Yaw = CFrame.identity }
+	render.Base =
+		{ Code = base.Id, Model = model, Parts = parts, Offsets = offsets, Height = base.Height, Yaw = CFrame.identity }
 end
 
 local function addPlayer(player: Player)
@@ -246,6 +290,31 @@ local function step(dt: number)
 		if not visible then
 			continue
 		end
+		if render.Character ~= character then
+			render.Character = character
+			render.HeadClearance = 0
+			local function measure()
+				if render.Character ~= character or not character then
+					return
+				end
+				local headPart = character:FindFirstChild("Head") :: BasePart?
+				if not headPart then
+					return
+				end
+				local highest = headPart.Position.Y + headPart.Size.Y / 2
+				for _, accessory in character:GetChildren() do
+					if accessory:IsA("Accessory") then
+						local handle = accessory:FindFirstChild("Handle") :: BasePart?
+						if handle then
+							highest = math.max(highest, handle.Position.Y + handle.Size.Y / 2)
+						end
+					end
+				end
+				render.HeadClearance = math.clamp(highest - headPart.Position.Y - headPart.Size.Y / 2, 0, 6)
+			end
+			measure()
+			task.delay(2, measure)
+		end
 		head = head :: BasePart
 		root = root :: BasePart
 
@@ -253,7 +322,9 @@ local function step(dt: number)
 		local velocity = root.AssemblyLinearVelocity
 		local accel = (velocity - render.LastVel) / math.max(dt, 1e-3)
 		render.LastVel = velocity
-		local force = -render.Lean * SPRING - render.LeanVel * DAMPING - Vector2.new(accel.X, accel.Z) * ACCEL_GAIN * SPRING
+		local force = -render.Lean * SPRING
+			- render.LeanVel * DAMPING
+			- Vector2.new(accel.X, accel.Z) * ACCEL_GAIN * SPRING
 		render.LeanVel += force * dt
 		render.Lean += render.LeanVel * dt
 		if render.Lean.Magnitude > MAX_LEAN then
@@ -273,7 +344,8 @@ local function step(dt: number)
 		local perStud = lean / math.max(totalHeight, 12)
 
 		local yawOnly = CFrame.fromOrientation(0, select(2, root.CFrame:ToOrientation()), 0)
-		local cfWorldTilt = CFrame.new(head.Position + Vector3.new(0, head.Size.Y / 2 + 0.1, 0))
+		local cfWorldTilt =
+			CFrame.new(head.Position + Vector3.new(0, head.Size.Y / 2 + 0.1 + (render.HeadClearance or 0), 0))
 		local base = render.Base
 		if base then
 			local center = cfWorldTilt * CFrame.new(0, base.Height / 2, 0) * yawOnly

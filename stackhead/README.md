@@ -8,6 +8,8 @@ wobbles too much and comes crashing down for everyone else to grab.
 - Economy model: [`docs/ECONOMY.md`](docs/ECONOMY.md)
 - Monetization strategy: [`docs/MONETIZATION.md`](docs/MONETIZATION.md)
 - Store art: [`marketing/`](marketing/)
+- September overhaul: [`docs/REVISAO-2026-09.md`](docs/REVISAO-2026-09.md)
+- Original audio: [`assets/audio/`](assets/audio/)
 - Handoff state: [`PROJECT_STATE.md`](PROJECT_STATE.md)
 
 ## Play it in Studio
@@ -16,6 +18,7 @@ Requirements: [Rojo](https://rojo.space) 7.x (and optionally [Lune](https://lune
 
 ```bash
 cd stackhead
+mkdir -p build
 rojo build default.project.json -o build/Stackhead.rbxl
 ```
 

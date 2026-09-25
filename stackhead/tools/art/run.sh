@@ -11,8 +11,8 @@ rojo build default.project.json -o build/Stackhead.rbxl >/dev/null
 lune run tools/preview/export_scene.luau build/Stackhead.rbxl "$OUT/scene.json"
 [ -d "$OUT/node_modules/three" ] || (cd "$OUT" && npm install --silent three@0.180.0)
 cp tools/art/art.html tools/art/composite.html "$OUT/"
-# Fonts are shared with the preview pipeline (tools/preview/run.sh fetches them).
-cp build/preview/fonts.css build/preview/f*.woff2 "$OUT/" 2>/dev/null || true
+# Font stylesheet is tracked; initial rendering needs access to Google Fonts.
+cp tools/art/fonts.css "$OUT/"
 PORT=${PORT:-8124}
 (cd "$OUT" && exec python3 -m http.server "$PORT" >/dev/null 2>&1) &
 SERVER=$!

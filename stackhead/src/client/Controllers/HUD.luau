@@ -45,6 +45,7 @@ local rainLabel: TextLabel
 local collectionLabel: TextLabel
 local windLoop: Sound?
 local glueButton: TextButton
+local steadyButton: TextButton
 local dashButton: TextButton
 local menuButtons: { [string]: TextButton } = {}
 local badges: { [string]: TextLabel } = {}
@@ -210,7 +211,7 @@ local function buildMenuButtons()
 		Name = "Menu",
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 12, 0.5, 0),
-		Size = UDim2.fromOffset(size, 4 * size + 24),
+		Size = UDim2.fromOffset(size, 5 * size + 32),
 		BackgroundTransparency = 1,
 		Parent = gui,
 	}, {
@@ -224,6 +225,7 @@ local function buildMenuButtons()
 		{ Id = "Worlds", Text = "🌍\nWORLDS", Color = C.Blue },
 		{ Id = "Shop", Text = "🛒\nSHOP", Color = C.Purple },
 		{ Id = "Tasks", Text = "📋\nTASKS", Color = C.Gold },
+		{ Id = "Settings", Text = "⚙\nSETTINGS", Color = C.PanelLight },
 	}
 	for order, spec in specs do
 		local button = UIKit.button({
@@ -262,6 +264,21 @@ local function buildActions()
 		Parent = gui,
 	})
 	UIKit.textLimit(glueButton, 22)
+	steadyButton = UIKit.button({
+		Name = "Steady",
+		Text = "STEADY [E]",
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -18, 1, -112),
+		Size = UDim2.fromOffset(170, 48),
+		BackgroundColor3 = C.Green,
+		Parent = gui,
+	})
+	UIKit.textLimit(steadyButton, 20)
+	player:GetAttributeChangedSignal("Steady"):Connect(function()
+		local enabled = player:GetAttribute("Steady") == true
+		steadyButton.Text = if enabled then "STEADY: ON" else (if HUD.isTouch then "STEADY" else "STEADY [E]")
+		steadyButton.BackgroundColor3 = if enabled then C.Gold else C.Green
+	end)
 end
 
 -- On touch devices, park Dash above Roblox's jump button and Glue to its
@@ -288,6 +305,8 @@ local function followJumpButton()
 		glueButton.AnchorPoint = Vector2.new(1, 1)
 		glueButton.Size = UDim2.fromOffset(size, size)
 		glueButton.Position = UDim2.fromOffset(jumpPos.X - 10, jumpPos.Y + jumpSize.Y)
+		steadyButton.Position = UDim2.fromOffset(jumpPos.X - 10, jumpPos.Y - 10)
+		steadyButton.Size = UDim2.fromOffset(size + 20, 48)
 	end
 	jump:GetPropertyChangedSignal("AbsolutePosition"):Connect(place)
 	jump:GetPropertyChangedSignal("AbsoluteSize"):Connect(place)
@@ -379,13 +398,20 @@ local function showBankPopup(info)
 		Parent = popup,
 	})
 	local lines = {
-		string.format("📦 %d items  ×%s height bonus", info.Count, string.sub(Format.multiplier(info.HeightMult), 2)),
+		string.format(
+			"📦 %d items  ×%s height bonus",
+			info.Count,
+			string.sub(Format.multiplier(info.HeightMult), 2)
+		),
 	}
 	if info.CoinMult and info.CoinMult > 1.001 then
 		table.insert(lines, string.format("%s coin boost", Format.multiplier(info.CoinMult)))
 	end
 	if info.DiscoveryBonus > 0 then
-		table.insert(lines, string.format("✨ %d new discoveries  +%s", #info.Discoveries, Format.short(info.DiscoveryBonus)))
+		table.insert(
+			lines,
+			string.format("✨ %d new discoveries  +%s", #info.Discoveries, Format.short(info.DiscoveryBonus))
+		)
 	end
 	if info.FirstBonus > 0 then
 		table.insert(lines, string.format("🎉 First delivery bonus  +%d", info.FirstBonus))
@@ -443,7 +469,11 @@ local function refreshData()
 	-- Badge on WORLDS when a better world is unlocked than the one you're in.
 	local worldsBadge = false
 	for _, world in WorldIndex.list do
-		if data.Upgrades.Strength >= world.FirstTier and data.World and WorldIndex:get(data.World).Index < world.Index then
+		if
+			data.Upgrades.Strength >= world.FirstTier
+			and data.World
+			and WorldIndex:get(data.World).Index < world.Index
+		then
 			worldsBadge = true
 		end
 	end
@@ -454,7 +484,8 @@ local function refreshData()
 	lastCoins = data.Coins
 
 	local armed = ClientState.glueArmed()
-	glueButton.Text = string.format("🧴 %d\n%s", data.Glue, if armed then "ARMED" elseif HUD.isTouch then "GLUE" else "[G]")
+	glueButton.Text =
+		string.format("🧴 %d\n%s", data.Glue, if armed then "ARMED" elseif HUD.isTouch then "GLUE" else "[G]")
 	glueButton.BackgroundColor3 = if armed then C.Green elseif data.Glue > 0 then C.Blue else C.Disabled
 
 	-- Badge when any upgrade is affordable.
@@ -500,7 +531,7 @@ local function updateWobble()
 		wobbleText.Text = "CAREFUL..."
 	else
 		color = C.Red
-		wobbleText.Text = "DANGER! STAND STILL!"
+		wobbleText.Text = "DANGER! USE STEADY!"
 	end
 	wobbleFill.BackgroundColor3 = color
 	if windLoop then
@@ -519,16 +550,23 @@ local function updateWobble()
 	local rainLeft = if typeof(rainEnds) == "number" then rainEnds - now else 0
 	local goldEnds = Workspace:GetAttribute("GoldenEndsAt")
 	local goldLeft = if typeof(goldEnds) == "number" then goldEnds - now else 0
-	rainLabel.Visible = rainLeft > 0 or goldLeft > 0
+	local nextRain = Workspace:GetAttribute("NextRainAt") or 0
+	rainLabel.Visible = rainLeft > 0 or goldLeft > 0 or nextRain > now
 	if rainLeft > 0 then
 		rainLabel.Text = "🌧️ ITEM RAIN " .. Format.duration(rainLeft)
 	elseif goldLeft > 0 then
 		rainLabel.Text = "✨ GOLDEN HOUR " .. Format.duration(goldLeft)
+	elseif nextRain > now then
+		rainLabel.Text = "ITEM RAIN IN " .. Format.duration(nextRain - now)
 	end
 end
 
 function HUD.menuButton(id: string): TextButton
 	return menuButtons[id]
+end
+
+function HUD.steadyButton(): TextButton
+	return steadyButton
 end
 
 function HUD.dashButton(): TextButton
@@ -548,7 +586,7 @@ function HUD.init()
 		Name = "HUD",
 		ResetOnSpawn = false,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-		ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
+		ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
 		Parent = player:WaitForChild("PlayerGui"),
 	})
 	buildTop()
@@ -556,6 +594,39 @@ function HUD.init()
 	buildMenuButtons()
 	buildActions()
 	buildToasts()
+	local function layout()
+		local width, height = gui.AbsoluteSize.X, gui.AbsoluteSize.Y
+		local compact = width < 900 or height < 550
+		local column = gui:FindFirstChild("Menu") :: Frame
+		local old = column:FindFirstChildOfClass("UIListLayout")
+		if old then
+			old:Destroy()
+		end
+		local grid = column:FindFirstChildOfClass("UIGridLayout") or Instance.new("UIGridLayout")
+		grid.CellPadding = UDim2.fromOffset(6, 6)
+		grid.CellSize = UDim2.fromOffset(if compact then 48 else 66, if compact then 48 else 66)
+		grid.SortOrder = Enum.SortOrder.LayoutOrder
+		grid.Parent = column
+		local portrait = width < 600
+		grid.FillDirectionMaxCells = if portrait then 5 elseif compact then 2 else 1
+		column.AnchorPoint = if portrait then Vector2.new(0.5, 0) else Vector2.new(0, 0.5)
+		column.Position = if portrait then UDim2.new(0.5, 0, 0, 60) else UDim2.new(0, 10, 0.5, 12)
+		column.Size = if portrait
+			then UDim2.fromOffset(264, 48)
+			elseif compact then UDim2.fromOffset(102, 156)
+			else UDim2.fromOffset(66, 354)
+		collectionLabel.Visible = not compact
+		coinsFrame.Size = UDim2.fromOffset(if compact then 190 else 230, 48)
+		boostLabel.Position = UDim2.new(0.5, -65, 1, 0)
+		wobbleFrame.Position = UDim2.new(0.5, 0, 0, if portrait then 116 else 70)
+		wobbleFrame.Size = UDim2.new(if compact then 0.4 else 0.5, 0, 0, 22)
+		stackFrame.Position = UDim2.new(1, -10, 0, if portrait then 146 else 6)
+		stackFrame.Size = UDim2.fromOffset(if compact then 140 else 170, 108)
+		rainLabel.Position = UDim2.new(0.5, 0, 0, if portrait then 260 else 96)
+		toastList.Position = UDim2.new(0.5, 0, 0, if portrait then 296 else 128)
+	end
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
+	layout()
 	task.spawn(followJumpButton)
 
 	ClientState.Changed:Connect(refreshData)
@@ -575,7 +646,6 @@ function HUD.init()
 			UIKit.pop(wobbleFrame, 0.2)
 		end
 	end)
-
 
 	Remotes.Notify.OnClientEvent:Connect(function(message)
 		if typeof(message) ~= "table" or typeof(message.Text) ~= "string" then
@@ -605,8 +675,14 @@ function HUD.init()
 				HUD.toast("✨ New discovery: " .. prefix .. def.Name, if suffix ~= "" then "Record" else "Info")
 			end
 		end
+		if info.NewRecord and info.Count >= 10 and info.PreviousBest and info.PreviousBest < 10 then
+			HUD.toast("PIZZA TRAY unlocked! Equip your reward in SHOP.", "Unlock")
+		end
 		for _, milestone in info.Milestones or {} do
-			HUD.toast(string.format("🏆 %d STACK! Title: %s  +%d glue", milestone.Stack, milestone.Title, milestone.Glue), "Record")
+			HUD.toast(
+				string.format("🏆 %d STACK! Title: %s  +%d glue", milestone.Stack, milestone.Title, milestone.Glue),
+				"Record"
+			)
 			Audio.play("Rare")
 		end
 	end)

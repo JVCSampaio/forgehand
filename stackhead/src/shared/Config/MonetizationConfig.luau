@@ -34,21 +34,21 @@ MonetizationConfig.GamePasses = {
 		Id = 0,
 		PriceHint = 49,
 		DisplayName = "Rainbow Trail",
-		Description = "Leave a rainbow behind you.",
+		Description = "Every dash paints a rainbow trail. Visible to everyone.",
 		Icon = "🌈",
 	},
 	UfoBase = {
 		Id = 0,
 		PriceHint = 99,
 		DisplayName = "UFO Saucer Base",
-		Description = "Your tower rides a glowing saucer.",
+		Description = "Carry your record on a glowing UFO. Permanent base; preview below.",
 		Icon = "🛸",
 	},
 	FlameBase = {
 		Id = 0,
 		PriceHint = 149,
 		DisplayName = "Flame Ring Base",
-		Description = "Your tower stands on fire. Literally.",
+		Description = "A blazing base under every tower. Permanent; everyone sees it.",
 		Icon = "🔥",
 	},
 }
@@ -102,7 +102,7 @@ MonetizationConfig.Products = {
 		Id = 0,
 		PriceHint = 99,
 		DisplayName = "Item Rain",
-		Description = "Make items rain on the WHOLE server for 30s.",
+		Description = "30 seconds of loot for everyone, announced in your name. Also happens free.",
 		Icon = "🌧️",
 		Grant = { ItemRain = true },
 	},
@@ -124,7 +124,8 @@ MonetizationConfig.Products = {
 	},
 }
 
-MonetizationConfig.ProductOrder = { "StarterPack", "Glue3", "Boost15", "ItemRain", "GoldenHour", "CoinsSmall", "Glue10", "CoinsLarge" }
+MonetizationConfig.ProductOrder =
+	{ "StarterPack", "Glue3", "Boost15", "ItemRain", "GoldenHour", "CoinsSmall", "Glue10", "CoinsLarge" }
 
 -- Receipts remembered per player to make grants idempotent.
 MonetizationConfig.ReceiptHistory = 60

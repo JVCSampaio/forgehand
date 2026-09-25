@@ -14,6 +14,7 @@ local EconomyConfig = require(Shared.Config.EconomyConfig)
 local Economy = require(Shared.Economy)
 local Wobble = require(Shared.Wobble)
 local StackCodec = require(Shared.StackCodec)
+local MovementGuard = require(Shared.MovementGuard)
 local Remotes = require(Shared.Remotes)
 local WorldIndex = require(Shared.WorldIndex)
 local RateLimiter = require(script.Parent.Parent.Util.RateLimiter)
@@ -43,6 +44,9 @@ type PlayerState = {
 	InBank: boolean,
 	LastPos: Vector3?,
 	LastImplausible: number,
+	MoveCredit: number,
+	Steady: boolean,
+	LastSafeCFrame: CFrame?,
 	Dirty: boolean,
 	LastWobbleSent: number,
 	Picked: { any },
@@ -52,6 +56,7 @@ local states: { [Player]: PlayerState } = {}
 local bankedCallbacks = {}
 local dashLimiter = RateLimiter.new(3, 1)
 local glueLimiter = RateLimiter.new(4, 2)
+local steadyLimiter = RateLimiter.new(6, 3)
 
 local function newState(): PlayerState
 	return {
@@ -67,6 +72,9 @@ local function newState(): PlayerState
 		InBank = false,
 		LastPos = nil,
 		LastImplausible = -math.huge,
+		MoveCredit = 8,
+		Steady = false,
+		LastSafeCFrame = nil,
 		Dirty = true,
 		LastWobbleSent = -1,
 		Picked = {},
@@ -82,11 +90,25 @@ function StackService.getState(player: Player): PlayerState?
 	return states[player]
 end
 
+-- Only trusted server travel can reset the movement baseline.
+function StackService.authorizePosition(player: Player, cf: CFrame)
+	local state = states[player]
+	if state then
+		state.LastPos = cf.Position
+		state.LastSafeCFrame = cf
+		state.MoveCredit = 8
+		state.ImmuneUntil = os.clock() + 3
+		state.Wobble = Wobble.newState()
+	end
+end
+
 -- Every world has a bank at its centre.
 local function isInBank(position: Vector3): boolean
 	local world = WorldIndex:at(position)
 	local offset = position - world.Origin
-	return Vector2.new(offset.X, offset.Z).Magnitude <= GameConfig.Bank.Radius and offset.Y <= GameConfig.Bank.MaxHeightAbove
+	return Vector2.new(offset.X, offset.Z).Magnitude <= GameConfig.Bank.Radius
+		and offset.Y >= -2
+		and offset.Y <= GameConfig.Bank.MaxHeightAbove
 end
 
 function StackService.isInBank(position: Vector3): boolean
@@ -170,6 +192,7 @@ local function bank(player: Player, state: PlayerState, profile)
 		Discoveries = discoveries,
 		Milestones = milestones,
 		NewRecord = count > oldBest,
+		PreviousBest = oldBest,
 	})
 	if count >= GameConfig.Events.BroadcastStack then
 		for _, other in Players:GetPlayers() do
@@ -194,7 +217,8 @@ local function scatterPoint(origin: Vector3): Vector3
 	local centre = WorldIndex:at(origin).Origin
 	local angle = math.random() * math.pi * 2
 	local distance = loose.ScatterMin + math.random() * (loose.ScatterMax - loose.ScatterMin)
-	local flat = Vector2.new(origin.X - centre.X + math.cos(angle) * distance, origin.Z - centre.Z + math.sin(angle) * distance)
+	local flat =
+		Vector2.new(origin.X - centre.X + math.cos(angle) * distance, origin.Z - centre.Z + math.sin(angle) * distance)
 	local r = flat.Magnitude
 	local minR = GameConfig.Bank.Radius + 3
 	local maxR = GameConfig.Layout.BoundaryRadius - 6
@@ -276,7 +300,10 @@ local function pickups(player: Player, state: PlayerState, profile, position: Ve
 			local taken = ItemSpawnService.take(model)
 			if taken then
 				table.insert(state.Codes, taken.Code)
-				table.insert(state.Entries, { Value = taken.Def.Value, RarityMult = taken.RarityMult, Height = taken.Def.Height })
+				table.insert(
+					state.Entries,
+					{ Value = taken.Def.Value, RarityMult = taken.RarityMult, Height = taken.Def.Height }
+				)
 				state.Height += taken.Def.Height
 				state.Dirty = true
 				table.insert(state.Picked, { taken.Code, from })
@@ -307,7 +334,13 @@ local function checkBumps(player: Player, state: PlayerState, position: Vector3,
 				if otherProfile then
 					otherState.ImmuneUntil = now + DASH_CFG.VictimImmunity
 					state.DashUntil = 0
-					Wobble.kick(otherState.Wobble, DASH_CFG.BumpKick, otherState.Height, StatsService.balanceMult(otherProfile), WOBBLE_CFG)
+					Wobble.kick(
+						otherState.Wobble,
+						DASH_CFG.BumpKick,
+						otherState.Height,
+						StatsService.balanceMult(otherProfile),
+						WOBBLE_CFG
+					)
 					Remotes.Bumped:FireClient(other, player.UserId, true)
 					Remotes.Bumped:FireClient(player, other.UserId, false)
 					Analytics.custom(player, "Bump", #otherState.Codes)
@@ -340,16 +373,29 @@ local function tickPlayer(player: Player, state: PlayerState, dt: number, now: n
 		end
 		local moved = Vector2.new(position.X - state.LastPos.X, position.Z - state.LastPos.Z).Magnitude
 		local dashing = now - state.LastDash < 1
-		local allowedSpeed = humanoid.WalkSpeed * GameConfig.Movement.SpeedTolerance + (if dashing then DASH_CFG.Impulse else 0)
-		plausible = moved <= allowedSpeed * dt + 3
+		local speed = StatsService.walkSpeed(profile)
+			* (if state.Steady then GameConfig.Movement.SteadySpeedMult else 1)
+		local allowedSpeed = speed + (if dashing and now - state.LastDash < 0.4 then DASH_CFG.Impulse else 0)
+		plausible, state.MoveCredit = MovementGuard.step(state.MoveCredit, moved, allowedSpeed, dt)
+		if position.Y ~= position.Y or math.abs(position.Y) == math.huge then
+			plausible = false
+		end
 		if not plausible then
 			state.LastImplausible = now
+			-- Roll back BEFORE banking, pickups, or bumps. Waiting at the illicit
+			-- destination cannot make an invalid teleport eligible next tick.
+			if state.LastSafeCFrame then
+				root.CFrame = state.LastSafeCFrame
+			end
+			root.AssemblyLinearVelocity = Vector3.zero
+			return
 		end
 	else
 		-- First tick after spawning: don't count spawn velocity as a disturbance.
 		state.Wobble.VelX, state.Wobble.VelY, state.Wobble.VelZ = velocity.X, velocity.Y, velocity.Z
 	end
 	state.LastPos = position
+	state.LastSafeCFrame = root.CFrame
 
 	state.InBank = isInBank(position)
 	if state.InBank then
@@ -359,9 +405,7 @@ local function tickPlayer(player: Player, state: PlayerState, dt: number, now: n
 			bank(player, state, profile)
 		end
 	else
-		if plausible then
-			pickups(player, state, profile, position)
-		end
+		pickups(player, state, profile, position)
 		local balance = StatsService.balanceMult(profile)
 		if now >= state.GraceUntil then
 			Wobble.step(state.Wobble, {
@@ -371,13 +415,10 @@ local function tickPlayer(player: Player, state: PlayerState, dt: number, now: n
 				VelZ = velocity.Z,
 				Height = state.Height,
 				BalanceMult = balance,
+				Steady = state.Steady,
 			}, WOBBLE_CFG)
 		else
 			state.Wobble.VelX, state.Wobble.VelY, state.Wobble.VelZ = velocity.X, velocity.Y, velocity.Z
-		end
-		if not plausible then
-			-- Teleports and speed hacks shake the stack instead of paying out.
-			Wobble.kick(state.Wobble, 0.5, state.Height, balance, WOBBLE_CFG)
 		end
 		if state.Wobble.Value >= 1 then
 			collapse(player, state, profile, nil)
@@ -419,6 +460,10 @@ local function onPlayerAdded(player: Player)
 			state.Height = 0
 			state.Wobble = Wobble.newState()
 			state.LastPos = nil
+			state.LastSafeCFrame = nil
+			state.Steady = false
+			state.MoveCredit = 8
+			player:SetAttribute("Steady", false)
 			state.Dirty = true
 		end
 		local humanoid = character:WaitForChild("Humanoid", 10) :: Humanoid?
@@ -447,6 +492,7 @@ function StackService.init()
 		states[player] = nil
 		dashLimiter:forget(player)
 		glueLimiter:forget(player)
+		steadyLimiter:forget(player)
 	end)
 
 	DataService.onLoaded(function(player, profile)
@@ -456,6 +502,21 @@ function StackService.init()
 	DataService.addSyncBuilder(function(player, _profile, snapshot)
 		local state = states[player]
 		snapshot.GlueArmed = state ~= nil and state.GlueArmed
+	end)
+
+	Remotes.SetSteady.OnServerEvent:Connect(function(player, enabled)
+		if typeof(enabled) ~= "boolean" or not steadyLimiter:allow(player) then
+			return
+		end
+		local state = states[player]
+		local profile = DataService.getProfile(player)
+		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		if not state or not profile or not humanoid or humanoid.Health <= 0 then
+			return
+		end
+		state.Steady = enabled
+		player:SetAttribute("Steady", enabled)
+		StatsService.apply(player)
 	end)
 
 	Remotes.Dash.OnServerEvent:Connect(function(player)
@@ -470,6 +531,9 @@ function StackService.init()
 		local now = os.clock()
 		-- Small tolerance for latency jitter; the client enforces the full cooldown.
 		if now - state.LastDash < DASH_CFG.Cooldown * 0.85 then
+			return
+		end
+		if state.Steady then
 			return
 		end
 		state.LastDash = now

@@ -27,7 +27,7 @@ CosmeticConfig.Bases = {
 		Id = "pizza",
 		Name = "Pizza Tray",
 		Icon = "🍕",
-		Unlock = { Kind = "Record", Stack = 25 },
+		Unlock = { Kind = "Record", Stack = 10 },
 		Height = 0.4,
 		Parts = {
 			{ Shape = "VCylinder", Size = { 3, 0.3, 3 }, Color = { 190, 190, 200 }, Material = "Metal" },
@@ -43,10 +43,34 @@ CosmeticConfig.Bases = {
 		Height = 0.7,
 		Parts = {
 			{ Shape = "Block", Size = { 2.8, 0.6, 2.8 }, Color = { 160, 30, 50 }, Material = "Fabric" },
-			{ Shape = "Ball", Size = { 0.5, 0.5, 0.5 }, Offset = { 1.3, -0.1, 1.3 }, Color = { 255, 200, 60 }, Material = "Foil" },
-			{ Shape = "Ball", Size = { 0.5, 0.5, 0.5 }, Offset = { -1.3, -0.1, 1.3 }, Color = { 255, 200, 60 }, Material = "Foil" },
-			{ Shape = "Ball", Size = { 0.5, 0.5, 0.5 }, Offset = { 1.3, -0.1, -1.3 }, Color = { 255, 200, 60 }, Material = "Foil" },
-			{ Shape = "Ball", Size = { 0.5, 0.5, 0.5 }, Offset = { -1.3, -0.1, -1.3 }, Color = { 255, 200, 60 }, Material = "Foil" },
+			{
+				Shape = "Ball",
+				Size = { 0.5, 0.5, 0.5 },
+				Offset = { 1.3, -0.1, 1.3 },
+				Color = { 255, 200, 60 },
+				Material = "Foil",
+			},
+			{
+				Shape = "Ball",
+				Size = { 0.5, 0.5, 0.5 },
+				Offset = { -1.3, -0.1, 1.3 },
+				Color = { 255, 200, 60 },
+				Material = "Foil",
+			},
+			{
+				Shape = "Ball",
+				Size = { 0.5, 0.5, 0.5 },
+				Offset = { 1.3, -0.1, -1.3 },
+				Color = { 255, 200, 60 },
+				Material = "Foil",
+			},
+			{
+				Shape = "Ball",
+				Size = { 0.5, 0.5, 0.5 },
+				Offset = { -1.3, -0.1, -1.3 },
+				Color = { 255, 200, 60 },
+				Material = "Foil",
+			},
 		},
 	},
 	{
@@ -70,7 +94,14 @@ CosmeticConfig.Bases = {
 		Height = 0.6,
 		Parts = {
 			{ Shape = "VCylinder", Size = { 2.8, 0.5, 2.8 }, Color = { 245, 250, 255 }, Material = "Snow" },
-			{ Shape = "Block", Size = { 0.5, 0.5, 0.5 }, Offset = { 1, 0.2, 0.6 }, Rot = { 45, 0, 45 }, Color = { 150, 220, 255 }, Material = "Neon" },
+			{
+				Shape = "Block",
+				Size = { 0.5, 0.5, 0.5 },
+				Offset = { 1, 0.2, 0.6 },
+				Rot = { 45, 0, 45 },
+				Color = { 150, 220, 255 },
+				Material = "Neon",
+			},
 		},
 	},
 	{
@@ -92,7 +123,13 @@ CosmeticConfig.Bases = {
 		Height = 0.4,
 		Parts = {
 			{ Shape = "VCylinder", Size = { 2.8, 0.3, 2.8 }, Color = { 30, 30, 40 }, Material = "Metal" },
-			{ Shape = "VCylinder", Size = { 3, 0.1, 3 }, Offset = { 0, -0.1, 0 }, Color = { 0, 255, 230 }, Material = "Neon" },
+			{
+				Shape = "VCylinder",
+				Size = { 3, 0.1, 3 },
+				Offset = { 0, -0.1, 0 },
+				Color = { 0, 255, 230 },
+				Material = "Neon",
+			},
 		},
 	},
 	{
@@ -103,7 +140,13 @@ CosmeticConfig.Bases = {
 		Height = 0.5,
 		Parts = {
 			{ Shape = "VCylinder", Size = { 2.6, 0.4, 2.6 }, Color = { 60, 80, 200 } },
-			{ Shape = "Block", Size = { 1.2, 0.42, 1.2 }, Rot = { 0, 45, 0 }, Color = { 255, 220, 60 }, Material = "Neon" },
+			{
+				Shape = "Block",
+				Size = { 1.2, 0.42, 1.2 },
+				Rot = { 0, 45, 0 },
+				Color = { 255, 220, 60 },
+				Material = "Neon",
+			},
 			{ Shape = "Block", Size = { 1.2, 0.42, 1.2 }, Color = { 255, 220, 60 }, Material = "Neon" },
 		},
 	},
@@ -127,7 +170,13 @@ CosmeticConfig.Bases = {
 		Parts = {
 			{ Shape = "VCylinder", Size = { 3.4, 0.4, 3.4 }, Color = { 200, 205, 220 }, Material = "Metal" },
 			{ Shape = "VCylinder", Size = { 3.6, 0.12, 3.6 }, Color = { 0, 255, 150 }, Material = "Neon" },
-			{ Shape = "Ball", Size = { 1.6, 1.6, 1.6 }, Offset = { 0, -0.5, 0 }, Color = { 150, 155, 170 }, Material = "Metal" },
+			{
+				Shape = "Ball",
+				Size = { 1.6, 1.6, 1.6 },
+				Offset = { 0, -0.5, 0 },
+				Color = { 150, 155, 170 },
+				Material = "Metal",
+			},
 		},
 	},
 	{
@@ -139,7 +188,13 @@ CosmeticConfig.Bases = {
 		Fire = true,
 		Parts = {
 			{ Shape = "VCylinder", Size = { 2.8, 0.4, 2.8 }, Color = { 40, 30, 30 }, Material = "Slate" },
-			{ Shape = "VCylinder", Size = { 3, 0.15, 3 }, Offset = { 0, 0.1, 0 }, Color = { 255, 120, 30 }, Material = "Neon" },
+			{
+				Shape = "VCylinder",
+				Size = { 3, 0.15, 3 },
+				Offset = { 0, 0.1, 0 },
+				Color = { 255, 120, 30 },
+				Material = "Neon",
+			},
 		},
 	},
 	{
@@ -150,7 +205,13 @@ CosmeticConfig.Bases = {
 		Height = 0.8,
 		Parts = {
 			{ Shape = "Block", Size = { 2.6, 0.7, 2.6 }, Color = { 170, 120, 70 }, Material = "Wood" },
-			{ Shape = "Block", Size = { 2.7, 0.15, 2.7 }, Offset = { 0, 0.3, 0 }, Color = { 255, 200, 60 }, Material = "Metal" },
+			{
+				Shape = "Block",
+				Size = { 2.7, 0.15, 2.7 },
+				Offset = { 0, 0.3, 0 },
+				Color = { 255, 200, 60 },
+				Material = "Metal",
+			},
 		},
 	},
 }

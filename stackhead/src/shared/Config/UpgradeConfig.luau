@@ -42,7 +42,7 @@ UpgradeConfig.Upgrades = {
 		BaseCost = 60,
 		Growth = 1.6,
 		Base = 1,
-		PerLevel = 0.22,
+		PerLevel = 0.15,
 		Unit = "x",
 	},
 	Strength = {
@@ -54,14 +54,14 @@ UpgradeConfig.Upgrades = {
 		-- Cost to go from level N to N+1 is Costs[N]. Levels 5, 9 and 13 open
 		-- Frostpeak, Candy Coast and Neon City.
 		Costs = {
-			1000,
-			4600,
-			20000,
-			120000,
-			1400000,
-			5900000,
-			12000000,
-			18000000,
+			400,
+			1400,
+			5500,
+			22000,
+			650000,
+			2400000,
+			6000000,
+			10000000,
 			110000000,
 			300000000,
 			660000000,

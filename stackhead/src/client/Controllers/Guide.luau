@@ -105,7 +105,7 @@ local function update()
 	local cheapest = cheapestUpgrade(data)
 
 	if wobble > 0.65 then
-		setObjective("⚠️ Too wobbly! STAND STILL to steady your stack!", UIKit.Colors.Red)
+		setObjective("⚠️ Too wobbly! Use STEADY to walk safely with your tower!", UIKit.Colors.Red)
 		showBeam = true
 	elseif data.Banks == 0 and count == 0 then
 		setObjective("Walk into items to stack them on your head!")
@@ -119,19 +119,32 @@ local function update()
 	elseif count == 0 and strengthCost and data.Coins >= strengthCost then
 		local zone = WorldIndex:zoneForTier(strength + 1)
 		local world = WorldIndex:worldForTier(strength + 1)
-		local target = if world and world.FirstTier == strength + 1 then world.DisplayName else (zone and zone.DisplayName or "a new zone")
+		local target = if world and world.FirstTier == strength + 1
+			then world.DisplayName
+			else (zone and zone.DisplayName or "a new zone")
 		setObjective(string.format("💪 Buy Strength to unlock %s!", target), UIKit.Colors.Gold)
-		UIKit.pop(HUD.menuButton("Upgrades"), 0.05)
+		-- The affordable badge is enough; no continuous bounce.
 	elseif count == 0 and WorldIndex:worldForTier(strength) ~= here and here.FirstTier < strength then
 		local best = WorldIndex:worldForTier(strength)
-		setObjective(string.format("%s %s pays way more. Open WORLDS to travel!", best.Icon, best.DisplayName), UIKit.Colors.Gold)
-		UIKit.pop(HUD.menuButton("Worlds"), 0.05)
-	elseif count == 0 and data.Upgrades.Speed + data.Upgrades.Reach + data.Upgrades.Balance == 0 and cheapest and data.Coins >= cheapest then
+		setObjective(
+			string.format("%s %s pays way more. Open WORLDS to travel!", best.Icon, best.DisplayName),
+			UIKit.Colors.Gold
+		)
+		-- World badge communicates this change.
+	elseif
+		count == 0
+		and data.Upgrades.Speed + data.Upgrades.Reach + data.Upgrades.Balance == 0
+		and cheapest
+		and data.Coins >= cheapest
+	then
 		setObjective("Open UPGRADE and buy your first upgrade!", UIKit.Colors.Green)
-		UIKit.pop(HUD.menuButton("Upgrades"), 0.05)
+		-- The affordable badge is enough; no continuous bounce.
 	elseif count >= 10 then
 		local mult = Economy.heightMultiplier(count, EconomyConfig.HeightBonus)
-		setObjective(string.format("Bonus %s — go taller or bank it before it falls!", Format.multiplier(mult)), UIKit.Colors.Gold)
+		setObjective(
+			string.format("Bonus %s — go taller or bank it before it falls!", Format.multiplier(mult)),
+			UIKit.Colors.Gold
+		)
 		showBeam = count >= 20
 	elseif count > 0 then
 		setObjective("Taller stacks pay more. Bank in the middle!")
@@ -146,7 +159,9 @@ local function update()
 			end
 		end
 		if nextMilestone then
-			setObjective(string.format("Next record: %d stack → title \"%s\"", nextMilestone.Stack, nextMilestone.Title))
+			setObjective(
+				string.format('Next record: %d stack → title "%s"', nextMilestone.Stack, nextMilestone.Title)
+			)
 		else
 			setObjective("Legend. Beat your best: " .. data.BestStack)
 		end

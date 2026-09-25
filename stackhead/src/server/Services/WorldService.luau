@@ -15,6 +15,8 @@ local Themes = script.Parent.Parent.World.Themes
 local WorldService = {}
 
 local kits: { [string]: any } = {}
+local mapFolder: Folder
+local builtCallbacks = {}
 
 function WorldService.kit(worldId: string)
 	return kits[worldId]
@@ -82,11 +84,11 @@ local function buildLighting()
 	correction.Saturation = look.Saturation
 	correction.TintColor = look.Tint
 	correction.Contrast = 0.08
-	correction.Brightness = 0.02
+	correction.Brightness = 0
 	correction.Parent = Lighting
 
 	local bloom = Instance.new("BloomEffect")
-	bloom.Intensity = 0.4
+	bloom.Intensity = 0.16
 	bloom.Size = 20
 	bloom.Threshold = 1.6
 	bloom.Parent = Lighting
@@ -101,28 +103,31 @@ local function buildLighting()
 	clouds.Parent = Workspace.Terrain
 end
 
+function WorldService.onBuilt(callback)
+	table.insert(builtCallbacks, callback)
+end
+
+function WorldService.ensure(world)
+	if kits[world.Id] then
+		return
+	end
+	local kit = Kit.new(world, mapFolder, Random.new(world.Seed))
+	require(Themes[world.Theme]).build(kit)
+	kits[world.Id] = kit
+	for _, callback in builtCallbacks do
+		callback(world)
+	end
+end
+
 function WorldService.init()
 	buildLighting()
-	local mapFolder = Instance.new("Folder")
+	mapFolder = Instance.new("Folder")
 	mapFolder.Name = "Map"
-	for _, world in WorldIndex.list do
-		local started = os.clock()
-		local kit = Kit.new(world, mapFolder, Random.new(world.Seed))
-		require(Themes[world.Theme]).build(kit)
-		kits[world.Id] = kit
-		local parts = 0
-		for _, d in kit.folder:GetDescendants() do
-			if d:IsA("BasePart") then
-				parts += 1
-			end
-		end
-		print(string.format("[WorldService] %s: %d parts, %d obstacles (%.0f ms)", world.Id, parts, #kit.obstacles, (os.clock() - started) * 1000))
-	end
 	mapFolder.Parent = Workspace
-
 	local items = Instance.new("Folder")
 	items.Name = "Items"
 	items.Parent = Workspace
+	WorldService.ensure(WorldIndex.list[1])
 end
 
 return WorldService

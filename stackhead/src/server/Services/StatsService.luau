@@ -79,6 +79,7 @@ function StatsService.apply(player: Player)
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		humanoid.WalkSpeed = StatsService.walkSpeed(profile)
+			* (if player:GetAttribute("Steady") then GameConfig.Movement.SteadySpeedMult else 1)
 	end
 	rainbowTrail(character, MonetizationService.ownsPass(player, "RainbowTrail"))
 	player:SetAttribute("VIP", MonetizationService.ownsPass(player, "VIP"))

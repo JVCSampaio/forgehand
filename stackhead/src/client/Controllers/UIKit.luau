@@ -1,5 +1,6 @@
 -- Tiny helpers for building UI in code, plus the shared visual style.
 
+local ClientState = require(script.Parent.ClientState)
 local UIKit = {}
 
 UIKit.Colors = {
@@ -105,7 +106,8 @@ function UIKit.button(props: { [string]: any }): TextButton
 		PaddingRight = UDim.new(0, 6),
 		PaddingTop = UDim.new(0, 4),
 		PaddingBottom = UDim.new(0, 4),
-	}).Parent = button
+	}).Parent =
+		button
 	return button
 end
 
@@ -115,13 +117,20 @@ end
 
 -- Quick scale "pop" feedback.
 function UIKit.pop(guiObject: GuiObject, amount: number?)
+	if
+		game:GetService("GuiService").ReducedMotionEnabled
+		or (ClientState.Data and ClientState.Data.Settings and ClientState.Data.Settings.ReducedMotion)
+	then
+		return
+	end
 	local scale = guiObject:FindFirstChildOfClass("UIScale")
 	if not scale then
 		scale = UIKit.create("UIScale", { Parent = guiObject })
 	end
 	local TweenService = game:GetService("TweenService")
 	scale.Scale = 1 + (amount or 0.15)
-	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
+		:Play()
 end
 
 return UIKit

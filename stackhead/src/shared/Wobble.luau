@@ -45,8 +45,15 @@ function Wobble.step(state: State, input, cfg): State
 
 	local factor = Wobble.heightFactor(input.Height, cfg)
 	local recovery = if speed < cfg.StillSpeed then cfg.RecoverStill else cfg.RecoverMoving
+	-- A deliberate slow walk trades collection speed for control. Bump kicks
+	-- remain unchanged, so steady mode does not grant PvP invulnerability.
+	if input.Steady then
+		disturbance *= cfg.SteadyDisturbanceMult
+		recovery = math.max(recovery, cfg.RecoverSteady)
+	end
 
-	state.Value = math.max(0, state.Value + disturbance * factor / input.BalanceMult - recovery * input.BalanceMult * dt)
+	state.Value =
+		math.max(0, state.Value + disturbance * factor / input.BalanceMult - recovery * input.BalanceMult * dt)
 	state.VelX = input.VelX
 	state.VelY = input.VelY
 	state.VelZ = input.VelZ

@@ -109,7 +109,8 @@ local function refreshPasses(player: Player)
 	local set = {}
 	for key, pass in MonetizationConfig.GamePasses do
 		if pass.Id ~= 0 then
-			local ok, result = pcall(MarketplaceService.UserOwnsGamePassAsync, MarketplaceService, player.UserId, pass.Id)
+			local ok, result =
+				pcall(MarketplaceService.UserOwnsGamePassAsync, MarketplaceService, player.UserId, pass.Id)
 			set[key] = ok and result == true
 		end
 	end
@@ -143,7 +144,13 @@ local function grant(player: Player, profile, product): boolean
 	if g.ScaledCoins then
 		local amount = g.ScaledCoins * Economy.tierScale(profile.Upgrades.Strength, EconomyConfig)
 		profile.Coins += amount
-		Analytics.source(player, amount, profile.Coins, Enum.AnalyticsEconomyTransactionType.IAP.Name, product.DisplayName)
+		Analytics.source(
+			player,
+			amount,
+			profile.Coins,
+			Enum.AnalyticsEconomyTransactionType.IAP.Name,
+			product.DisplayName
+		)
 	end
 	if g.ItemRain then
 		if not rainHandler then
@@ -170,7 +177,9 @@ local function processReceipt(receipt)
 	end
 	local purchaseId = tostring(receipt.PurchaseId)
 	if profile.Purchases[purchaseId] then
-		return Enum.ProductPurchaseDecision.PurchaseGranted
+		return if DataService.forceSave(player)
+			then Enum.ProductPurchaseDecision.PurchaseGranted
+			else Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 
 	local product = MonetizationConfig.Products[key]
@@ -202,7 +211,13 @@ function MonetizationService.init()
 		if purchased and key and owned[player] then
 			owned[player][key] = true
 			Analytics.custom(player, "PassPurchase_" .. key)
-			Remotes.Notify:FireClient(player, { Kind = "Purchase", Text = "Thanks! " .. MonetizationConfig.GamePasses[key].DisplayName .. " unlocked." })
+			Remotes.Notify:FireClient(
+				player,
+				{
+					Kind = "Purchase",
+					Text = "Thanks! " .. MonetizationConfig.GamePasses[key].DisplayName .. " unlocked.",
+				}
+			)
 			firePassChanged(player)
 		end
 	end)

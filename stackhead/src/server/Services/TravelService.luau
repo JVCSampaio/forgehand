@@ -40,6 +40,7 @@ end
 local function place(player: Player, worldId: string): boolean
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	require(script.Parent.WorldService).ensure(WorldIndex:get(worldId))
 	local pads = padsFor(worldId)
 	if not character or not root or #pads == 0 then
 		return false
@@ -51,6 +52,7 @@ local function place(player: Player, worldId: string): boolean
 		return false
 	end
 	character:PivotTo(target)
+	StackService.authorizePosition(player, root.CFrame)
 	return true
 end
 

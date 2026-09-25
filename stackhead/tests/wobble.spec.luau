@@ -91,4 +91,18 @@ T.describe("Wobble", function()
 		T.eq(Wobble.keepCount(10, cfg), 5)
 		T.eq(Wobble.keepCount(1, cfg), 0)
 	end)
+	T.it("steady recovers an endangered tower while moving", function()
+		local normal, steady = Wobble.newState(), Wobble.newState()
+		normal.Value, steady.Value = 0.75, 0.75
+		for _ = 1, 20 do
+			Wobble.step(normal, { Dt = 0.1, VelX = 8, VelY = 0, VelZ = 0, Height = 100, BalanceMult = 1 }, cfg)
+			Wobble.step(
+				steady,
+				{ Dt = 0.1, VelX = 8, VelY = 0, VelZ = 0, Height = 100, BalanceMult = 1, Steady = true },
+				cfg
+			)
+		end
+		T.truthy(steady.Value < 0.75)
+		T.truthy(steady.Value < normal.Value)
+	end)
 end)

@@ -22,6 +22,8 @@ local Audio = require(script.Parent.Audio)
 local HUD = require(script.Parent.HUD)
 
 local Menus = {}
+local CosmeticPreview = require(script.Parent.CosmeticPreview)
+local GuiService = game:GetService("GuiService")
 
 local C = UIKit.Colors
 local create = UIKit.create
@@ -33,6 +35,7 @@ local priceCache: { [string]: number } = {}
 
 local function closePanel()
 	if openPanel then
+		GuiService.SelectedObject = nil
 		openPanel:Destroy()
 		openPanel = nil
 	end
@@ -89,6 +92,10 @@ local function makePanel(title: string, quiet: boolean?): (Frame, ScrollingFrame
 		create("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
 	})
 	openPanel = panel
+	panel.SelectionGroup = true
+	if game:GetService("UserInputService").GamepadEnabled then
+		GuiService.SelectedObject = close
+	end
 	if not quiet then
 		UIKit.pop(panel, 0.08)
 	end
@@ -197,12 +204,12 @@ function Menus.openUpgrades()
 	refreshUpgrades()
 end
 
-local function livePrice(key: string, id: number, infoType: Enum.InfoType, hint: number): number
+local function livePrice(key: string, id: number, infoType: Enum.InfoType, _hint: number): number?
 	if priceCache[key] then
 		return priceCache[key]
 	end
 	local ok, info = pcall(MarketplaceService.GetProductInfo, MarketplaceService, id, infoType)
-	local price = if ok and info and info.PriceInRobux then info.PriceInRobux else hint
+	local price = if ok and info and info.PriceInRobux then info.PriceInRobux else nil
 	priceCache[key] = price
 	return price
 end
@@ -250,9 +257,14 @@ function Menus.openShop(quiet: boolean?)
 			return button
 		end
 		task.spawn(function()
-			local price = livePrice(key, spec.Id, if isPass then Enum.InfoType.GamePass else Enum.InfoType.Product, spec.PriceHint)
+			local price = livePrice(
+				key,
+				spec.Id,
+				if isPass then Enum.InfoType.GamePass else Enum.InfoType.Product,
+				spec.PriceHint
+			)
 			if button.Parent then
-				button.Text = "R$ " .. price
+				button.Text = if price then "R$ " .. price else "VIEW PRICE"
 			end
 		end)
 		button.Activated:Connect(function()
@@ -278,7 +290,7 @@ function Menus.openShop(quiet: boolean?)
 		UIKit.label({
 			Text = body,
 			Position = UDim2.fromOffset(0, 32),
-			Size = UDim2.new(0.62, 0, 0, height - 44),
+			Size = UDim2.new(0.62, 0, 0, math.min(height - 44, 42)),
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = Enum.TextYAlignment.Top,
 			TextWrapped = true,
@@ -290,6 +302,12 @@ function Menus.openShop(quiet: boolean?)
 		return frame
 	end
 
+	sectionHeader(list, nextOrder(), "YOUR TOWER. YOUR STYLE.")
+	textRow(
+		"Try the free Pizza Tray",
+		"Bank 10 items to earn it. Preview the real bases below; everyone sees your equipped style.",
+		100
+	)
 	-- One-time starter offer, only until bought.
 	local starter = MonetizationConfig.Products.StarterPack
 	if starter.Id ~= 0 and data and not data.StarterPackBought then
@@ -307,7 +325,8 @@ function Menus.openShop(quiet: boolean?)
 		local pass = passKey and MonetizationConfig.GamePasses[passKey]
 		if unlocked or not (pass and pass.Id == 0) then
 			local detail = if unlocked then "Unlocked" else "🔒 " .. Cosmetics.requirement(base)
-			local frame = textRow(base.Icon .. " " .. base.Name, detail, 70)
+			local frame = textRow(base.Icon .. " " .. base.Name, detail, 160)
+			CosmeticPreview.attach(frame, base)
 			if unlocked then
 				local button = UIKit.button({
 					Text = if equipped then "EQUIPPED" else "EQUIP",
@@ -337,7 +356,7 @@ function Menus.openShop(quiet: boolean?)
 		if spec.Id ~= 0 and not BASE_PASSES[key] then
 			any = true
 			local owned = data and data.Passes and data.Passes[key]
-			local frame = textRow(spec.Icon .. " " .. spec.DisplayName, spec.Description, 74)
+			local frame = textRow(spec.Icon .. " " .. spec.DisplayName, spec.Description, 100)
 			buyButton(frame, key, spec, true, owned)
 		end
 	end
@@ -346,7 +365,7 @@ function Menus.openShop(quiet: boolean?)
 		local spec = MonetizationConfig.Products[key]
 		if spec.Id ~= 0 and key ~= "StarterPack" then
 			any = true
-			local frame = textRow(spec.Icon .. " " .. spec.DisplayName, spec.Description, 74)
+			local frame = textRow(spec.Icon .. " " .. spec.DisplayName, spec.Description, 100)
 			buyButton(frame, key, spec, false)
 		end
 	end
@@ -400,7 +419,11 @@ function Menus.openTasks(quiet: boolean?)
 		Parent = daily,
 	})
 	UIKit.label({
-		Text = string.format("🪙 %s%s · come back tomorrow for a bigger one", Format.short(reward.Coins * scale), if reward.Glue > 0 then string.format(" + 🧴%d", reward.Glue) else ""),
+		Text = string.format(
+			"🪙 %s%s · come back tomorrow for a bigger one",
+			Format.short(reward.Coins * scale),
+			if reward.Glue > 0 then string.format(" + 🧴%d", reward.Glue) else ""
+		),
 		Position = UDim2.fromOffset(0, 34),
 		Size = UDim2.new(0.62, 0, 0, 30),
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -446,7 +469,13 @@ function Menus.openTasks(quiet: boolean?)
 			Parent = frame,
 		})
 		UIKit.label({
-			Text = string.format("%s / %s · reward 🪙%s%s", Format.short(math.min(progress, order.Target)), Format.short(order.Target), Format.short(order.RewardCoins), if order.RewardGlue > 0 then " + 🧴" .. order.RewardGlue else ""),
+			Text = string.format(
+				"%s / %s · reward 🪙%s%s",
+				Format.short(math.min(progress, order.Target)),
+				Format.short(order.Target),
+				Format.short(order.RewardCoins),
+				if order.RewardGlue > 0 then " + 🧴" .. order.RewardGlue else ""
+			),
 			Position = UDim2.fromOffset(0, 32),
 			Size = UDim2.new(0.62, 0, 0, 22),
 			TextXAlignment = Enum.TextXAlignment.Left,
@@ -520,7 +549,10 @@ function Menus.openWorlds(quiet: boolean?)
 		})
 		local here = data.World == world.Id
 		local button = UIKit.button({
-			Text = if here then "YOU'RE HERE" elseif unlocked then "TRAVEL" else string.format("🔒 💪%d", world.FirstTier),
+			Text = if here
+				then "YOU'RE HERE"
+				elseif unlocked then "TRAVEL"
+				else string.format("🔒 💪%d", world.FirstTier),
 			AnchorPoint = Vector2.new(1, 0.5),
 			Position = UDim2.new(1, 0, 0.5, 0),
 			Size = UDim2.new(0.34, 0, 0, 58),
@@ -543,7 +575,44 @@ function Menus.openWorlds(quiet: boolean?)
 	end
 end
 
+function Menus.openSettings()
+	local _, list = makePanel("SETTINGS")
+	local specs =
+		{ { "Sfx", "Sound effects" }, { "Memes", "Funny sounds" }, { "Music", "Music" }, {
+			"ReducedMotion",
+			"Reduce motion",
+		} }
+	for order, spec in specs do
+		local frame = row(list, order, 66)
+		UIKit.label({
+			Text = spec[2],
+			Size = UDim2.new(0.62, 0, 1, 0),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 12,
+			Parent = frame,
+		})
+		local settings = ClientState.Data and ClientState.Data.Settings or {}
+		local enabled = settings[spec[1]] == true
+		local button = UIKit.button({
+			Text = if enabled then "ON" else "OFF",
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.fromScale(1, 0.5),
+			Size = UDim2.new(0.32, 0, 0, 44),
+			BackgroundColor3 = if enabled then C.Green else C.Disabled,
+			ZIndex = 12,
+			Parent = frame,
+		})
+		button.Activated:Connect(function()
+			enabled = not enabled
+			button.Text = if enabled then "ON" else "OFF"
+			button.BackgroundColor3 = if enabled then C.Green else C.Disabled
+			Remotes.SetSetting:FireServer(spec[1], enabled)
+		end)
+	end
+end
+
 function Menus.init()
+	HUD.menuButton("Settings").Activated:Connect(Menus.openSettings)
 	HUD.menuButton("Tasks").Activated:Connect(function()
 		Audio.play("Click")
 		if openPanel and openPanel.Name == "📋 TASKS" then

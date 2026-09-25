@@ -19,6 +19,9 @@ local player = Players.LocalPlayer
 local lastDash = -math.huge
 
 local function dash()
+	if player:GetAttribute("Steady") then
+		return
+	end
 	local now = os.clock()
 	if now - lastDash < GameConfig.Dash.Cooldown then
 		return
@@ -78,6 +81,16 @@ local function toggleGlue()
 end
 
 function Input.init()
+	local function steady()
+		Remotes.SetSteady:FireServer(player:GetAttribute("Steady") ~= true)
+	end
+	HUD.steadyButton().Activated:Connect(steady)
+	ContextActionService:BindAction("StackheadSteady", function(_, state)
+		if state == Enum.UserInputState.Begin then
+			steady()
+		end
+		return Enum.ContextActionResult.Sink
+	end, false, Enum.KeyCode.E, Enum.KeyCode.ButtonL1)
 	HUD.dashButton().Activated:Connect(dash)
 	HUD.glueButton().Activated:Connect(toggleGlue)
 	ContextActionService:BindAction("StackheadDash", function(_, state)

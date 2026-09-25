@@ -3,7 +3,7 @@
 
 local GameConfig = {}
 
-GameConfig.Version = "0.1.0"
+GameConfig.Version = "0.2.0"
 
 -- Server simulation rate for pickups, wobble, banking and bumps.
 GameConfig.TickRate = 10
@@ -67,6 +67,8 @@ GameConfig.Wobble = {
 	-- Drain per second, multiplied by the balance multiplier.
 	RecoverStill = 0.34,
 	RecoverMoving = 0.07,
+	RecoverSteady = 0.30,
+	SteadyDisturbanceMult = 0.3,
 	-- Horizontal speed below which the player counts as standing still.
 	StillSpeed = 1.5,
 	-- Balance multiplier per Balance upgrade level.
@@ -110,7 +112,8 @@ GameConfig.Movement = {
 	BaseWalkSpeed = 16,
 	-- Server rejects pickups during ticks faster than this multiple of the
 	-- allowed speed (teleports / speed hacks).
-	SpeedTolerance = 1.8,
+	SpeedTolerance = 1.1,
+	SteadySpeedMult = 0.55,
 }
 
 GameConfig.Camera = {
@@ -120,7 +123,8 @@ GameConfig.Camera = {
 GameConfig.Events = {
 	ItemRain = {
 		-- Automatic rain every N seconds (0 disables).
-		Interval = 540,
+		Interval = 240,
+		FirstRainDelay = 75,
 		Duration = 30,
 		ItemsPerSecond = 5,
 		-- Rarity chances are multiplied by this during rain.
@@ -138,10 +142,11 @@ GameConfig.Leaderboard = {
 }
 
 GameConfig.Render = {
-	MaxItemsLocal = 320,
-	MaxItemsOthers = 160,
+	MaxItemsLocal = 64,
+	MaxItemsOthers = 24,
 	-- Other players' stacks further than this are not rendered.
 	OtherRenderDistance = 450,
+	ProxySegments = 24,
 }
 
 return GameConfig

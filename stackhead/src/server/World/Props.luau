@@ -12,8 +12,20 @@ function Props.tree(kit, base: Vector3, scale: number, leafColor: Color3?)
 	local leaves = leafColor or C(76, 165, 70):Lerp(C(128, 196, 70), rng:NextNumber())
 	kit:column(base, 5 * scale, 1.3 * scale, C(112, 78, 48), M.Wood)
 	kit:ball(base + Vector3.new(0, 6.2 * scale, 0), 6.4 * scale, leaves, M.SmoothPlastic, { CanCollide = false })
-	kit:ball(base + Vector3.new(1.6 * scale, 5.2 * scale, 0.8 * scale), 4 * scale, leaves:Lerp(C(40, 120, 50), 0.25), M.SmoothPlastic, { CanCollide = false })
-	kit:ball(base + Vector3.new(-1.4 * scale, 5.6 * scale, -1 * scale), 3.8 * scale, leaves:Lerp(C(160, 210, 90), 0.2), M.SmoothPlastic, { CanCollide = false })
+	kit:ball(
+		base + Vector3.new(1.6 * scale, 5.2 * scale, 0.8 * scale),
+		4 * scale,
+		leaves:Lerp(C(40, 120, 50), 0.25),
+		M.SmoothPlastic,
+		{ CanCollide = false }
+	)
+	kit:ball(
+		base + Vector3.new(-1.4 * scale, 5.6 * scale, -1 * scale),
+		3.8 * scale,
+		leaves:Lerp(C(160, 210, 90), 0.2),
+		M.SmoothPlastic,
+		{ CanCollide = false }
+	)
 end
 
 function Props.pine(kit, base: Vector3, scale: number, snowy: boolean?)
@@ -21,9 +33,23 @@ function Props.pine(kit, base: Vector3, scale: number, snowy: boolean?)
 	local green = C(40, 105, 70)
 	for i, spec in { { 7, 2.6 }, { 5.4, 2.4 }, { 3.8, 2.2 }, { 2.2, 2 } } do
 		local y = 2 * scale + (i - 1) * 1.9 * scale
-		kit:column(base + Vector3.new(0, y, 0), spec[2] * scale, spec[1] * scale, green:Lerp(C(60, 130, 90), i / 5), M.SmoothPlastic, { CanCollide = i == 1 })
+		kit:column(
+			base + Vector3.new(0, y, 0),
+			spec[2] * scale,
+			spec[1] * scale,
+			green:Lerp(C(60, 130, 90), i / 5),
+			M.SmoothPlastic,
+			{ CanCollide = i == 1 }
+		)
 		if snowy then
-			kit:column(base + Vector3.new(0, y + spec[2] * scale - 0.2, 0), 0.35 * scale, spec[1] * scale * 0.85, C(248, 252, 255), M.Snow, { CanCollide = false })
+			kit:column(
+				base + Vector3.new(0, y + spec[2] * scale - 0.2, 0),
+				0.35 * scale,
+				spec[1] * scale * 0.85,
+				C(248, 252, 255),
+				M.Snow,
+				{ CanCollide = false }
+			)
 		end
 	end
 end
@@ -93,7 +119,11 @@ function Props.house(kit, cf: CFrame, wall: Color3, roof: Color3, width: number?
 	kit:block(cf * CFrame.new(0, 0.3, 0), Vector3.new(w + 1, 0.6, d + 1), C(200, 195, 185))
 	kit:block(cf * CFrame.new(0, 0.6 + h / 2, 0), Vector3.new(w, h, d), wall)
 	local roofH = 4.5
-	kit:wedge({ CFrame = cf * CFrame.new(0, 0.6 + h + roofH / 2, -d / 4 - 0.25), Size = Vector3.new(w + 1.2, roofH, d / 2 + 0.5), Color = roof })
+	kit:wedge({
+		CFrame = cf * CFrame.new(0, 0.6 + h + roofH / 2, -d / 4 - 0.25),
+		Size = Vector3.new(w + 1.2, roofH, d / 2 + 0.5),
+		Color = roof,
+	})
 	kit:wedge({
 		CFrame = cf * CFrame.new(0, 0.6 + h + roofH / 2, d / 4 + 0.25) * CFrame.Angles(0, math.pi, 0),
 		Size = Vector3.new(w + 1.2, roofH, d / 2 + 0.5),
@@ -113,9 +143,9 @@ function Props.stall(kit, cf: CFrame, awningA: Color3, awningB: Color3)
 	local wood = C(185, 135, 85)
 	kit:block(cf * CFrame.new(0, 1.6, 0), Vector3.new(8, 3.2, 3), wood, M.Wood)
 	kit:block(cf * CFrame.new(0, 3.25, -0.2), Vector3.new(8.4, 0.3, 3.6), C(225, 190, 140), M.Wood)
-	for _, x in { -3.8, 3.8 } do
-		kit:block(cf * CFrame.new(x, 4, 1.3), Vector3.new(0.4, 8, 0.4), C(245, 245, 245))
-		kit:block(cf * CFrame.new(x, 3.6, -1.3), Vector3.new(0.4, 3.8, 0.4), C(245, 245, 245))
+	for _, x in { -3.65, 3.65 } do
+		kit:block(cf * CFrame.new(x, 4, 1.15), Vector3.new(0.4, 8, 0.4), C(245, 245, 245))
+		kit:block(cf * CFrame.new(x, 3.6, -1.15), Vector3.new(0.4, 3.8, 0.4), C(245, 245, 245))
 	end
 	-- Striped awning: tall at the back (+Z), sloping to the customer side.
 	for i = 0, 5 do
@@ -128,7 +158,13 @@ function Props.stall(kit, cf: CFrame, awningA: Color3, awningB: Color3)
 	-- Goods on the counter.
 	local goods = { C(230, 50, 50), C(255, 200, 40), C(90, 190, 70), C(255, 140, 40) }
 	for i = 0, 4 do
-		kit:ball(cf * CFrame.new(-3 + i * 1.5, 3.8, -0.3).Position, 0.9, goods[(i % #goods) + 1], nil, { CanCollide = false })
+		kit:ball(
+			cf * CFrame.new(-3 + i * 1.5, 3.8, -0.3).Position,
+			0.9,
+			goods[(i % #goods) + 1],
+			nil,
+			{ CanCollide = false }
+		)
 	end
 end
 
@@ -137,7 +173,8 @@ function Props.crateStack(kit, base: Vector3, count: number)
 		local offset = Vector3.new(kit.rng:NextNumber(-1.5, 1.5), 0, kit.rng:NextNumber(-1.5, 1.5))
 		local layer = (i - 1) // 3
 		kit:block(
-			CFrame.new(base + offset + Vector3.new(0, 1.25 + layer * 2.5, 0)) * CFrame.Angles(0, kit.rng:NextNumber(-0.4, 0.4), 0),
+			CFrame.new(base + offset + Vector3.new(0, 1.25 + layer * 2.5, 0))
+				* CFrame.Angles(0, kit.rng:NextNumber(-0.4, 0.4), 0),
 			Vector3.new(2.5, 2.5, 2.5),
 			C(175, 125, 75),
 			M.Wood
@@ -148,14 +185,24 @@ end
 function Props.barrels(kit, base: Vector3, count: number, color: Color3?)
 	for i = 1, count do
 		local a = i / count * math.pi * 2
-		kit:column(base + Vector3.new(math.cos(a) * 1.4, 0, math.sin(a) * 1.4), 2.8, 1.9, color or C(150, 95, 55), M.Wood)
+		kit:column(
+			base + Vector3.new(math.cos(a) * 1.4, 0, math.sin(a) * 1.4),
+			2.8,
+			1.9,
+			color or C(150, 95, 55),
+			M.Wood
+		)
 	end
 end
 
 function Props.boat(kit, cf: CFrame, hull: Color3, cabin: Color3)
 	-- Hull sits in the water; bow points along -Z.
 	kit:block(cf * CFrame.new(0, -0.4, 1.5), Vector3.new(6, 2.6, 13), hull)
-	kit:wedge({ CFrame = cf * CFrame.new(0, -0.4, -7.5) * CFrame.Angles(0, math.pi, 0), Size = Vector3.new(6, 2.6, 5), Color = hull })
+	kit:wedge({
+		CFrame = cf * CFrame.new(0, -0.4, -7.5) * CFrame.Angles(0, math.pi, 0),
+		Size = Vector3.new(6, 2.6, 5),
+		Color = hull,
+	})
 	kit:block(cf * CFrame.new(0, 0.95, 1.5), Vector3.new(5.6, 0.2, 12.4), C(210, 170, 120), M.WoodPlanks)
 	kit:block(cf * CFrame.new(0, 2.6, 3.5), Vector3.new(4, 3.2, 4.5), cabin)
 	kit:block(cf * CFrame.new(0, 2.9, 1.2), Vector3.new(3.4, 1.4, 0.2), C(170, 215, 245), M.Glass)
@@ -166,7 +213,12 @@ end
 function Props.lighthouse(kit, base: Vector3)
 	kit:column(base + Vector3.new(0, -3, 0), 4, 16, C(140, 140, 150), M.Slate)
 	for i = 0, 5 do
-		kit:column(base + Vector3.new(0, 1 + i * 4, 0), 4, 8 - i * 0.6, if i % 2 == 0 then C(245, 245, 245) else C(220, 50, 50))
+		kit:column(
+			base + Vector3.new(0, 1 + i * 4, 0),
+			4,
+			8 - i * 0.6,
+			if i % 2 == 0 then C(245, 245, 245) else C(220, 50, 50)
+		)
 	end
 	kit:column(base + Vector3.new(0, 25, 0), 1, 7, C(40, 40, 45), M.Metal)
 	kit:column(base + Vector3.new(0, 26, 0), 3, 4.5, C(255, 240, 170), M.Neon)
@@ -178,8 +230,22 @@ end
 function Props.island(kit, center: Vector3, radius: number, grass: Color3?, sand: Color3?)
 	local base = Vector3.new(center.X, -1.5, center.Z)
 	kit:column(base, 2.4, radius * 2, sand or C(240, 220, 160), M.Sand, { CanCollide = false, CanQuery = false })
-	kit:column(base, 5 + radius * 0.08, radius * 1.6, grass or C(100, 170, 80), M.Grass, { CanCollide = false, CanQuery = false })
-	kit:column(base, 8 + radius * 0.14, radius * 0.9, (grass or C(100, 170, 80)):Lerp(C(60, 120, 60), 0.3), M.Grass, { CanCollide = false, CanQuery = false })
+	kit:column(
+		base,
+		5 + radius * 0.08,
+		radius * 1.6,
+		grass or C(100, 170, 80),
+		M.Grass,
+		{ CanCollide = false, CanQuery = false }
+	)
+	kit:column(
+		base,
+		8 + radius * 0.14,
+		radius * 0.9,
+		(grass or C(100, 170, 80)):Lerp(C(60, 120, 60), 0.3),
+		M.Grass,
+		{ CanCollide = false, CanQuery = false }
+	)
 	local top = base + Vector3.new(0, 8 + radius * 0.14, 0)
 	for i = 1, 3 do
 		local a = i * 2.1

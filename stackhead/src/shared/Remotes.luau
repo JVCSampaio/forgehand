@@ -6,6 +6,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local folder = ReplicatedStorage:WaitForChild("Remotes")
 
 local Remotes = {
+	SetSteady = folder:WaitForChild("SetSteady") :: RemoteEvent,
+	SetSetting = folder:WaitForChild("SetSetting") :: RemoteEvent,
 	-- client -> server
 	Dash = folder:WaitForChild("Dash") :: RemoteEvent,
 	UseGlue = folder:WaitForChild("UseGlue") :: RemoteEvent,

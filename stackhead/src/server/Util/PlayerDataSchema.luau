@@ -48,7 +48,7 @@ function Schema.defaults(economyConfig, upgradeConfig)
 		Funnel = {},
 		Purchases = {},
 		PurchaseOrder = {},
-		Settings = { Music = true, Sfx = true },
+		Settings = { Music = true, Sfx = true, Memes = true, ReducedMotion = false },
 		-- v2
 		LastWorld = "",
 		Orders = { Day = 0, List = {}, Progress = { 0, 0, 0 }, Claimed = { false, false, false } },
