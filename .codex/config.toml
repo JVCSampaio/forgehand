@@ -1,0 +1,10 @@
+# Project MCP servers for Codex (Astra). Claude Code reads .mcp.json.
+# Blender: install the addon once with `uvx mcp-for-blender install-addon`,
+# enable "Interface: MCP for Blender" and click Start MCP Server.
+[mcp_servers.blender]
+command = "uvx"
+args = ["mcp-for-blender"]
+
+# Unity: MCP for Unity (CoplayDev/unity-mcp) serves HTTP from the open Editor.
+[mcp_servers.unityMCP]
+url = "http://localhost:8080/mcp"
