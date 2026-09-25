@@ -47,6 +47,8 @@ local windLoop: Sound?
 local glueButton: TextButton
 local steadyButton: TextButton
 local dashButton: TextButton
+local toastQuietUntil = 0
+local lastMemeToast = 0
 local menuButtons: { [string]: TextButton } = {}
 local badges: { [string]: TextLabel } = {}
 
@@ -266,7 +268,7 @@ local function buildActions()
 	UIKit.textLimit(glueButton, 22)
 	steadyButton = UIKit.button({
 		Name = "Steady",
-		Text = "STEADY [E]",
+		Text = "STABILIZE: OFF [E]",
 		AnchorPoint = Vector2.new(1, 1),
 		Position = UDim2.new(1, -18, 1, -112),
 		Size = UDim2.fromOffset(170, 48),
@@ -276,7 +278,9 @@ local function buildActions()
 	UIKit.textLimit(steadyButton, 20)
 	player:GetAttributeChangedSignal("Steady"):Connect(function()
 		local enabled = player:GetAttribute("Steady") == true
-		steadyButton.Text = if enabled then "STEADY: ON" else (if HUD.isTouch then "STEADY" else "STEADY [E]")
+		steadyButton.Text = if enabled
+			then "STABILIZE: ON"
+			else (if HUD.isTouch then "STABILIZE: OFF" else "STABILIZE: OFF [E]")
 		steadyButton.BackgroundColor3 = if enabled then C.Gold else C.Green
 	end)
 end
@@ -347,6 +351,9 @@ local TOAST_COLORS = {
 }
 
 function HUD.toast(text: string, kind: string?)
+	if os.clock() < toastQuietUntil and kind ~= "Collapse" and kind ~= "Error" and kind ~= "Purchase" then
+		return
+	end
 	toastOrder += 1
 	local label = UIKit.label({
 		Text = text,
@@ -364,7 +371,7 @@ function HUD.toast(text: string, kind: string?)
 			table.insert(items, child)
 		end
 	end
-	if #items > 4 then
+	if #items > 1 then
 		table.sort(items, function(a, b)
 			return a.LayoutOrder < b.LayoutOrder
 		end)
@@ -387,10 +394,11 @@ local function showBankPopup(info)
 		Name = "BankPopup",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.42),
-		Size = UDim2.fromOffset(360, 170),
+		Size = UDim2.new(0.8, 0, 0, 170),
 		BackgroundTransparency = 1,
 		Parent = gui,
 	})
+	UIKit.create("UISizeConstraint", { MaxSize = Vector2.new(360, 220), Parent = popup })
 	local total = UIKit.label({
 		Text = "+0",
 		Size = UDim2.new(1, 0, 0, 80),
@@ -433,6 +441,10 @@ local function showBankPopup(info)
 	local duration = math.clamp(0.4 + info.Count * 0.02, 0.4, 1.4)
 	local connection
 	connection = RunService.RenderStepped:Connect(function()
+		if not total.Parent then
+			connection:Disconnect()
+			return
+		end
 		local t = math.min((os.clock() - start) / duration, 1)
 		total.Text = "+" .. Format.commas(target * (1 - (1 - t) ^ 3))
 		if t >= 1 then
@@ -512,8 +524,8 @@ end
 local function refreshStack()
 	local count, total, _base, heightMult = stackPreview()
 	stackFrame.Visible = count > 0
-	stackCount.Text = "📦 " .. count
-	stackDetail.Text = string.format("Bank: 🪙%s\nBonus %s", Format.short(total), Format.multiplier(heightMult))
+	stackCount.Text = string.format("%d ITEMS", count)
+	stackDetail.Text = string.format("DEPOSIT %s  •  %s", Format.short(total), Format.multiplier(heightMult))
 end
 
 local function updateWobble()
@@ -525,13 +537,13 @@ local function updateWobble()
 	local color
 	if wobble < 0.45 then
 		color = C.Green
-		wobbleText.Text = "STEADY"
+		wobbleText.Text = "FALL RISK: LOW"
 	elseif wobble < 0.75 then
 		color = C.Gold
-		wobbleText.Text = "CAREFUL..."
+		wobbleText.Text = "FALL RISK: RISING"
 	else
 		color = C.Red
-		wobbleText.Text = "DANGER! USE STEADY!"
+		wobbleText.Text = "HIGH RISK — STABILIZE!"
 	end
 	wobbleFill.BackgroundColor3 = color
 	if windLoop then
@@ -615,15 +627,26 @@ function HUD.init()
 			then UDim2.fromOffset(264, 48)
 			elseif compact then UDim2.fromOffset(102, 156)
 			else UDim2.fromOffset(66, 354)
-		collectionLabel.Visible = not compact
+		collectionLabel.Visible = false
 		coinsFrame.Size = UDim2.fromOffset(if compact then 190 else 230, 48)
 		boostLabel.Position = UDim2.new(0.5, -65, 1, 0)
-		wobbleFrame.Position = UDim2.new(0.5, 0, 0, if portrait then 116 else 70)
-		wobbleFrame.Size = UDim2.new(if compact then 0.4 else 0.5, 0, 0, 22)
-		stackFrame.Position = UDim2.new(1, -10, 0, if portrait then 146 else 6)
-		stackFrame.Size = UDim2.fromOffset(if compact then 140 else 170, 108)
-		rainLabel.Position = UDim2.new(0.5, 0, 0, if portrait then 260 else 96)
-		toastList.Position = UDim2.new(0.5, 0, 0, if portrait then 296 else 128)
+		-- All critical stack information stays inside the central safe column,
+		-- clear of Roblox's player list and the touch movement/action corners.
+		local top = if portrait then 116 else 62
+		stackFrame.AnchorPoint = Vector2.new(0.5, 0)
+		stackFrame.Position = UDim2.new(0.5, 0, 0, top)
+		stackFrame.Size = UDim2.fromOffset(if portrait then math.min(width - 24, 300) else 300, 60)
+		stackCount.Size = UDim2.new(1, 0, 0, 20)
+		stackCount.TextXAlignment = Enum.TextXAlignment.Center
+		stackDetail.Position = UDim2.fromOffset(0, 22)
+		stackDetail.Size = UDim2.new(1, 0, 0, 20)
+		stackDetail.TextXAlignment = Enum.TextXAlignment.Center
+		wobbleFrame.Position = UDim2.new(0.5, 0, 0, top + 66)
+		wobbleFrame.Size = UDim2.new(0, if portrait then math.min(width - 24, 300) else 300, 0, 22)
+		rainLabel.AnchorPoint = Vector2.new(0.5, 1)
+		rainLabel.Position = UDim2.new(0.5, 0, 1, -62)
+		rainLabel.Size = UDim2.new(0.45, 0, 0, 18)
+		toastList.Position = UDim2.new(0.5, 0, 0, top + 96)
 	end
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
 	layout()
@@ -667,23 +690,23 @@ function HUD.init()
 		end
 		Audio.play("Bank", 1 + math.min(info.Count, 50) * 0.01)
 		showBankPopup(info)
-		for _, code in info.Discoveries or {} do
-			local id, suffix = StackCodec.parse(code)
-			local def = ItemConfig.ById[id]
-			if def then
-				local prefix = if suffix == "g" then "GOLDEN " elseif suffix == "s" then "SHINY " else ""
-				HUD.toast("✨ New discovery: " .. prefix .. def.Name, if suffix ~= "" then "Record" else "Info")
+		toastQuietUntil = os.clock() + 3.3
+		for _, child in toastList:GetChildren() do
+			if child:IsA("TextLabel") then
+				child:Destroy()
 			end
 		end
+		local reward = nil
 		if info.NewRecord and info.Count >= 10 and info.PreviousBest and info.PreviousBest < 10 then
-			HUD.toast("PIZZA TRAY unlocked! Equip your reward in SHOP.", "Unlock")
+			reward = "PIZZA TRAY unlocked — try it in SHOP!"
+		elseif #(info.Milestones or {}) > 0 then
+			local milestone = info.Milestones[#info.Milestones]
+			reward = string.format("%s unlocked! +%d glue", milestone.Title, milestone.Glue)
 		end
-		for _, milestone in info.Milestones or {} do
-			HUD.toast(
-				string.format("🏆 %d STACK! Title: %s  +%d glue", milestone.Stack, milestone.Title, milestone.Glue),
-				"Record"
-			)
-			Audio.play("Rare")
+		if reward then
+			task.delay(3.4, function()
+				HUD.toast(reward, "Unlock")
+			end)
 		end
 	end)
 
@@ -696,7 +719,8 @@ function HUD.init()
 			local code = typeof(entry) == "table" and entry[1]
 			if typeof(code) == "string" then
 				local def = ItemConfig.ById[StackCodec.parse(code)]
-				if def and def.Meme then
+				if def and def.Meme and os.clock() - lastMemeToast > 3 then
+					lastMemeToast = os.clock()
 					HUD.toast("😂 MEME: " .. def.Name .. "!", "Meme")
 				end
 			end

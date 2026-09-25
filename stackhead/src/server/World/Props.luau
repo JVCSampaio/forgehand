@@ -58,7 +58,13 @@ function Props.lamp(kit, base: Vector3, poleColor: Color3?, lightColor: Color3?)
 	local pole = poleColor or C(40, 60, 50)
 	kit:column(base, 0.6, 1.2, pole)
 	kit:column(base, 9, 0.45, pole)
-	kit:ball(base + Vector3.new(0, 9.3, 0), 1.5, lightColor or C(255, 225, 150), M.Neon, { CanCollide = false })
+	kit:ball(
+		base + Vector3.new(0, 9.3, 0),
+		1.5,
+		lightColor or C(235, 214, 166),
+		M.SmoothPlastic,
+		{ CanCollide = false }
+	)
 	kit:column(base + Vector3.new(0, 9.9, 0), 0.3, 1.6, pole, nil, { CanCollide = false })
 end
 

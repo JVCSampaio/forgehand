@@ -117,7 +117,7 @@ GameConfig.Movement = {
 }
 
 GameConfig.Camera = {
-	MaxZoom = 320,
+	MaxZoom = 34,
 }
 
 GameConfig.Events = {

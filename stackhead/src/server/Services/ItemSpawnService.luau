@@ -86,9 +86,20 @@ local function tooCloseToItems(position: Vector3): boolean
 	return #hits > 0
 end
 
-local function findSpot(world, inner: number, outer: number): Vector3?
-	for _ = 1, GameConfig.Spawning.PlacementAttempts do
-		local point = WorldService.randomPointInRing(rng, world, inner + 2, outer - 2)
+-- Direct radial lanes versus short off-road cache detours. Both use the
+-- same authoritative obstacle/spacing checks; rarity is rolled only once.
+local function findSpot(world, inner: number, outer: number, cache: boolean): Vector3?
+	local quadrant = rng:NextInteger(0, 3) * math.pi / 2
+	for attempt = 1, GameConfig.Spawning.PlacementAttempts do
+		local angle = quadrant + (if cache then math.pi / 4 else 0) + rng:NextNumber(-0.035, 0.035)
+		local radius = if cache
+			then rng:NextNumber(inner + (outer - inner) * 0.4, inner + (outer - inner) * 0.7)
+			else rng:NextNumber(inner + 3, outer - 3)
+		local point = world.Origin
+			+ Vector3.new(math.cos(angle) * radius, GameConfig.Layout.GroundY, math.sin(angle) * radius)
+		if attempt > GameConfig.Spawning.PlacementAttempts / 2 then
+			point = WorldService.randomPointInRing(rng, world, inner + 2, outer - 2)
+		end
 		if not WorldService.isNearObstacle(point, 2) and not tooCloseToItems(point) then
 			return point
 		end
@@ -125,19 +136,20 @@ local function place(code: string, groundPosition: Vector3, info: ItemInfo, attr
 end
 
 function ItemSpawnService.spawnInZone(zone, rarityBoost: number?): Model?
-	local spot = findSpot(WorldIndex:get(zone.WorldId), zone.InnerRadius, zone.OuterRadius)
+	local cache = rng:NextNumber() < 0.2
+	local spot = findSpot(WorldIndex:get(zone.WorldId), zone.InnerRadius, zone.OuterRadius, cache)
 	if not spot then
 		return nil
 	end
 	local def = pickItem(zone.Tier)
-	local code = StackCodec.code(def.Id, rollRarity(rarityBoost or 1))
+	local code = StackCodec.code(def.Id, rollRarity((rarityBoost or 1) * (if cache then 2 else 1)))
 	local model = place(code, spot, {
 		Code = code,
 		Def = def,
 		RarityMult = ItemSpawnService.rarityMult(code),
 		Zone = zone.Key,
 		ReadyAt = 0,
-	})
+	}, { BonusFind = cache })
 	if model then
 		zoneCounts[zone.Key] = (zoneCounts[zone.Key] or 0) + 1
 	end
@@ -168,7 +180,7 @@ function ItemSpawnService.spawnLoose(
 		OwnerUntil = if owner then readyAt + GameConfig.Loose.OwnerPickupDelay else nil,
 		ExpiresAt = if zone then nil else now + GameConfig.Loose.Lifetime,
 		ReadyAt = readyAt,
-	}, { DropFrom = from, DropAt = readyAt })
+	}, { DropFrom = from, DropAt = readyAt, RecoverableUntil = readyAt + 8 })
 	if model then
 		if zone then
 			zoneCounts[zone] = (zoneCounts[zone] or 0) + 1
@@ -180,7 +192,7 @@ end
 -- Rain drops use the zone pool of whatever ring they land in, and count
 -- toward that zone's cap so rain can't flood the map permanently.
 function ItemSpawnService.spawnRainDrop(world, rarityBoost: number): Model?
-	local spot = findSpot(world, GameConfig.Bank.Radius + 4, world.Zones[#world.Zones].OuterRadius)
+	local spot = findSpot(world, GameConfig.Bank.Radius + 4, world.Zones[#world.Zones].OuterRadius, false)
 	if not spot then
 		return nil
 	end

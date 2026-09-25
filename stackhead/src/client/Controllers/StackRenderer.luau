@@ -15,6 +15,7 @@ local ItemBuilder = require(Shared.ItemBuilder)
 local StackCodec = require(Shared.StackCodec)
 local StackLOD = require(Shared.StackLOD)
 
+local ClientState = require(script.Parent.ClientState)
 local StackRenderer = {}
 
 type RenderItem = {
@@ -333,8 +334,12 @@ local function step(dt: number)
 
 		local wobble = player:GetAttribute("Wobble") or 0
 		local shakeSpeed = 3 + wobble * 9
-		local shake = Vector2.new(math.sin(now * shakeSpeed), math.cos(now * shakeSpeed * 1.3)) * wobble * 0.35
-		local lean = render.Lean + shake
+		local shake = Vector2.new(math.sin(now * shakeSpeed), math.cos(now * shakeSpeed * 1.3))
+			* wobble
+			* (0.35 + wobble * 1.2)
+		local reduced = game:GetService("GuiService").ReducedMotionEnabled
+			or (ClientState.Data and ClientState.Data.Settings.ReducedMotion)
+		local lean = render.Lean + (if reduced then Vector2.zero else shake)
 
 		local totalHeight = 0
 		for _, item in render.Items do

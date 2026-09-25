@@ -12,6 +12,7 @@ local order = {
 	"Menus",
 	"Input",
 	"Guide",
+	"TowerCamera",
 }
 
 for _, name in order do

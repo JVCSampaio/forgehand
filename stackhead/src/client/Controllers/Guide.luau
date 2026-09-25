@@ -18,7 +18,7 @@ local HUD = require(script.Parent.HUD)
 local Guide = {}
 
 local player = Players.LocalPlayer
-local objective: TextLabel
+local objective: TextButton
 local beam: Beam
 local beamStart: Attachment?
 local highlight: Highlight
@@ -27,6 +27,8 @@ local lockText: TextLabel
 local itemsFolder: Folder
 local bankAttachment: Attachment
 local lastText = ""
+local nearbyHighlights = {}
+local candidateItems = {}
 
 local function setObjective(text: string, color: Color3?)
 	if text ~= lastText then
@@ -55,6 +57,7 @@ end
 
 -- Nearest item within `radius`, split by whether the player can lift it.
 local function nearestItems(position: Vector3, radius: number, strength: number): (Model?, Model?)
+	table.clear(candidateItems)
 	local bestFree, bestFreeDist = nil, radius
 	local bestLocked, bestLockedDist = nil, radius
 	for _, model in itemsFolder:GetChildren() do
@@ -62,6 +65,9 @@ local function nearestItems(position: Vector3, radius: number, strength: number)
 		if root then
 			local distance = (root.Position - position).Magnitude
 			local tier = model:GetAttribute("Tier") or 1
+			if distance < 24 and tier <= strength then
+				table.insert(candidateItems, { Model = model, Distance = distance })
+			end
 			if tier > strength then
 				if distance < bestLockedDist then
 					bestLocked, bestLockedDist = model :: Model, distance
@@ -69,6 +75,22 @@ local function nearestItems(position: Vector3, radius: number, strength: number)
 			elseif distance < bestFreeDist then
 				bestFree, bestFreeDist = model :: Model, distance
 			end
+		end
+	end
+	table.sort(candidateItems, function(a, b)
+		return a.Distance < b.Distance
+	end)
+	for i, marker in nearbyHighlights do
+		local entry = candidateItems[i]
+		marker.Adornee = entry and entry.Model
+		marker.Enabled = entry ~= nil
+		if entry then
+			local model = entry.Model
+			local recovered = (model:GetAttribute("RecoverableUntil") or 0) > Workspace:GetServerTimeNow()
+			marker.OutlineColor = if recovered
+				then UIKit.Colors.Green
+				elseif model:GetAttribute("BonusFind") then UIKit.Colors.Gold
+				else Color3.fromRGB(235, 245, 255)
 		end
 	end
 	return bestFree, bestLocked
@@ -89,6 +111,9 @@ local function update()
 	local data = ClientState.Data
 	local root = rootPart()
 	if not data or not root then
+		for _, marker in nearbyHighlights do
+			marker.Enabled = false
+		end
 		return
 	end
 	ensureBeam(root)
@@ -99,20 +124,17 @@ local function update()
 	local strength = data.Upgrades.Strength
 	local free, locked = nearestItems(root.Position, 40, strength)
 	local showBeam = false
-	local showHighlight = false
 
 	local strengthCost = Economy.upgradeCost(UpgradeConfig.Upgrades.Strength, strength)
 	local cheapest = cheapestUpgrade(data)
 
 	if wobble > 0.65 then
-		setObjective("⚠️ Too wobbly! Use STEADY to walk safely with your tower!", UIKit.Colors.Red)
+		setObjective("⚠️ Too wobbly! Use STABILIZE — slow down and recover!", UIKit.Colors.Red)
 		showBeam = true
 	elseif data.Banks == 0 and count == 0 then
 		setObjective("Walk into items to stack them on your head!")
-		showHighlight = true
 	elseif data.Banks == 0 and count < 5 then
 		setObjective(string.format("Nice! Grab %d more…", 5 - count))
-		showHighlight = true
 	elseif data.Banks == 0 then
 		setObjective("Carry your stack to the BANK in the middle!", UIKit.Colors.Gold)
 		showBeam = true
@@ -146,6 +168,16 @@ local function update()
 			UIKit.Colors.Gold
 		)
 		showBeam = count >= 20
+	elseif strengthCost and data.Coins < strengthCost and data.Banks > 0 then
+		local zone = WorldIndex:zoneForTier(strength + 1)
+		setObjective(
+			string.format(
+				"%s coins to %s • UPGRADES",
+				Format.short(strengthCost - data.Coins),
+				zone and zone.DisplayName or "next tier"
+			),
+			UIKit.Colors.Gold
+		)
 	elseif count > 0 then
 		setObjective("Taller stacks pay more. Bank in the middle!")
 	elseif data.BestStack < 10 then
@@ -168,13 +200,29 @@ local function update()
 	end
 
 	beam.Enabled = showBeam
-	highlight.Adornee = if showHighlight then free else nil
-	highlight.Enabled = showHighlight and free ~= nil
+	highlight.Adornee = nil
+	highlight.Enabled = false
 
 	if locked and ((locked.PrimaryPart :: BasePart).Position - root.Position).Magnitude < 12 then
 		lockTag.Adornee = locked.PrimaryPart
 		lockTag.Enabled = true
+		lockText.TextColor3 = UIKit.Colors.Red
 		lockText.Text = string.format("🔒 Strength %d", locked:GetAttribute("Tier") or 0)
+	elseif
+		free
+		and free.PrimaryPart
+		and (free.PrimaryPart.Position - root.Position).Magnitude < 12
+		and (
+			(free:GetAttribute("RecoverableUntil") or 0) > Workspace:GetServerTimeNow() or free:GetAttribute(
+				"BonusFind"
+			)
+		)
+	then
+		lockTag.Adornee = free.PrimaryPart
+		lockTag.Enabled = true
+		local recovered = (free:GetAttribute("RecoverableUntil") or 0) > Workspace:GetServerTimeNow()
+		lockText.TextColor3 = if recovered then UIKit.Colors.Green else UIKit.Colors.Gold
+		lockText.Text = if recovered then "RECOVER ITEMS" else "2x RARITY CHANCE"
 	else
 		lockTag.Enabled = false
 	end
@@ -182,15 +230,30 @@ end
 
 function Guide.init()
 	itemsFolder = Workspace:WaitForChild("Items") :: Folder
-	objective = UIKit.label({
+	objective = UIKit.button({
 		Name = "Objective",
+		BackgroundColor3 = UIKit.Colors.Panel,
+		BackgroundTransparency = 0.15,
 		Text = "",
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, if HUD.isTouch then -8 else -24),
 		Size = UDim2.new(if HUD.isTouch then 0.5 else 0.6, 0, 0, 34),
 		Parent = HUD.gui(),
 	})
-	UIKit.textLimit(objective, 30)
+	UIKit.textLimit(objective, 20)
+	objective.Activated:Connect(function()
+		require(script.Parent.Menus).openUpgrades()
+	end)
+	local function layoutObjective()
+		local size = HUD.gui().AbsoluteSize
+		if HUD.isTouch then
+			objective.AnchorPoint = Vector2.new(0.5, 0)
+			objective.Position = UDim2.new(0.5, 0, 0, if size.X < 600 then 254 else 192)
+			objective.Size = UDim2.new(0.65, 0, 0, 38)
+		end
+	end
+	HUD.gui():GetPropertyChangedSignal("AbsoluteSize"):Connect(layoutObjective)
+	layoutObjective()
 	UIKit.create("UIScale", { Parent = objective })
 
 	bankAttachment = Instance.new("Attachment")
@@ -210,15 +273,23 @@ function Guide.init()
 
 	highlight = Instance.new("Highlight")
 	highlight.FillColor = Color3.fromRGB(255, 230, 100)
-	highlight.FillTransparency = 0.5
+	highlight.FillTransparency = 0.85
+	highlight.DepthMode = Enum.HighlightDepthMode.Occluded
 	highlight.OutlineColor = Color3.new(1, 1, 1)
 	highlight.Enabled = false
 	highlight.Parent = Workspace.Terrain
+	for _ = 1, 6 do
+		local marker = highlight:Clone()
+		marker.FillTransparency = 1
+		marker.Parent = Workspace.Terrain
+		table.insert(nearbyHighlights, marker)
+	end
 
 	lockTag = Instance.new("BillboardGui")
 	lockTag.Size = UDim2.fromOffset(150, 36)
 	lockTag.StudsOffsetWorldSpace = Vector3.new(0, 2.5, 0)
-	lockTag.AlwaysOnTop = true
+	lockTag.AlwaysOnTop = false
+	lockTag.MaxDistance = 35
 	lockTag.Enabled = false
 	lockText = UIKit.label({ Size = UDim2.fromScale(1, 1), TextColor3 = UIKit.Colors.Red })
 	lockText.Parent = lockTag

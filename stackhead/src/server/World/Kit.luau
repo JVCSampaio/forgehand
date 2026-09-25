@@ -96,7 +96,13 @@ function Kit:block(cf: CFrame, size: Vector3, color: Color3, material: Enum.Mate
 	return self:part(props)
 end
 
-function Kit:ball(position: Vector3, diameter: number, color: Color3, material: Enum.Material?, extra: { [string]: any }?): Part
+function Kit:ball(
+	position: Vector3,
+	diameter: number,
+	color: Color3,
+	material: Enum.Material?,
+	extra: { [string]: any }?
+): Part
 	local props = {
 		Shape = Enum.PartType.Ball,
 		CFrame = CFrame.new(position),
@@ -113,7 +119,14 @@ function Kit:ball(position: Vector3, diameter: number, color: Color3, material: 
 end
 
 -- Upright cylinder whose base sits at `base`.
-function Kit:column(base: Vector3, height: number, diameter: number, color: Color3, material: Enum.Material?, extra: { [string]: any }?): Part
+function Kit:column(
+	base: Vector3,
+	height: number,
+	diameter: number,
+	color: Color3,
+	material: Enum.Material?,
+	extra: { [string]: any }?
+): Part
 	local props = {
 		Shape = Enum.PartType.Cylinder,
 		CFrame = CFrame.new(base + Vector3.new(0, height / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)),
@@ -140,7 +153,14 @@ function Kit:cylinder(cf: CFrame, length: number, diameter: number, color: Color
 	})
 end
 
-function Kit:disc(radius: number, topY: number, color: Color3, material: Enum.Material?, name: string?, thickness: number?): Part
+function Kit:disc(
+	radius: number,
+	topY: number,
+	color: Color3,
+	material: Enum.Material?,
+	name: string?,
+	thickness: number?
+): Part
 	local t = thickness or 1
 	return self:part({
 		Name = name or "Disc",
@@ -248,7 +268,13 @@ function Kit:floors()
 	local zones = self.zones
 	for index = #zones, 1, -1 do
 		local zone = zones[index]
-		self:disc(zone.OuterRadius, self:top(index), zone.GroundColor, (Enum.Material :: any)[zone.Material], zone.Id .. "Ground")
+		self:disc(
+			zone.OuterRadius,
+			self:top(index),
+			zone.GroundColor,
+			(Enum.Material :: any)[zone.Material],
+			zone.Id .. "Ground"
+		)
 	end
 	for index = 2, #zones do
 		local border = self:disc(
@@ -276,7 +302,13 @@ function Kit:roads(surface: Color3, line: Color3?, material: Enum.Material?, edg
 			local length = outer - inner
 			local mid = dir * ((inner + outer) / 2)
 			local y = self:top(index) + 0.12
-			self:block(CFrame.new(mid + Vector3.new(0, y - 0.1, 0)) * rot, Vector3.new(width, 0.2, length), surface, material, { Name = "Road", CanQuery = false })
+			self:block(
+				CFrame.new(mid + Vector3.new(0, y - 0.1, 0)) * rot,
+				Vector3.new(width, 0.2, length),
+				surface,
+				material,
+				{ Name = "Road", CanQuery = false }
+			)
 			if edge then
 				for _, side in { -1, 1 } do
 					local offset = Vector3.new(-dir.Z, 0, dir.X) * side * (width / 2 + 0.3)
@@ -310,7 +342,7 @@ end
 
 function Kit:sign(localCF: CFrame, text: string, color: Color3, postColor: Color3?)
 	self:block(localCF * CFrame.new(0, 3.5, 0), Vector3.new(0.5, 7, 0.5), postColor or Color3.fromRGB(80, 64, 50))
-	local board = self:block(localCF * CFrame.new(0, 7.4, 0), Vector3.new(11, 3.4, 0.5), color, nil, { Name = "Sign" })
+	local board = self:block(localCF * CFrame.new(0, 7.4, 0), Vector3.new(8, 2.6, 0.5), color, nil, { Name = "Sign" })
 	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
 		local gui = Instance.new("SurfaceGui")
 		gui.Face = face
@@ -381,9 +413,9 @@ function Kit:bank(options)
 
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "BankLabel"
-	gui.Size = UDim2.fromOffset(260, 90)
+	gui.Size = UDim2.fromOffset(140, 44)
 	gui.StudsOffsetWorldSpace = Vector3.new(0, 8, 0)
-	gui.MaxDistance = 600
+	gui.MaxDistance = 260
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1

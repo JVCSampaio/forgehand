@@ -20,13 +20,18 @@ scattering the items as free loot. Design: `docs/DESIGN.md`. Economy: `docs/ECON
 - Analytics funnel + economy/progression/custom events
 - Client: stack renderer (bases, lean), effects, HUD, menus (Upgrades, Worlds, Tasks, Shop), guide, per-world lighting + snow, input for touch/keyboard/gamepad
 - StreamingEnabled with atomic item models
-- Tooling: 66 Lune tests, pacing sim with cost calibration, place verifier, **visual preview** (`tools/preview/run.sh`), **marketing art** (`tools/art/run.sh` → `marketing/`), **item gallery** (`SHOTS=gallery tools/art/run.sh`)
+- Tooling: 68 Lune tests, pacing sim with cost calibration, place verifier, **visual preview** (`tools/preview/run.sh`), **marketing art** (`tools/art/run.sh` → `marketing/`), **item gallery** (`SHOTS=gallery tools/art/run.sh`)
 
 ## Verified
 
 Clean luau-lsp typecheck (Roblox definitions), unit tests, pacing sim, `rojo build`,
 place verification, and visual inspection of every world rendered from the real
 generators. **Not yet run inside Roblox Studio.**
+
+## Playtest 02
+
+Video-driven fixes and current test build: `docs/PLAYTEST-02.md`.
+Open `build/Stackhead-Playtest-02.rbxl` for this revision.
 
 ## Current task
 

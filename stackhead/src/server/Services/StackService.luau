@@ -278,7 +278,11 @@ local function collapse(player: Player, state: PlayerState, profile, keepOverrid
 	local lost = count - keep
 	Remotes.Collapsed:FireAllClients(player.UserId, lost, origin)
 	if keepOverride == nil then
-		notify(player, "Collapse", string.format("CRASH! %d items fell. Stop moving to steady tall stacks!", lost))
+		notify(
+			player,
+			"Collapse",
+			string.format("CRASH! %d items fell. Use STABILIZE to recover. Pick up the fallen items!", lost)
+		)
 	end
 	Analytics.custom(player, "Collapse", count)
 	DataService.changed(player)

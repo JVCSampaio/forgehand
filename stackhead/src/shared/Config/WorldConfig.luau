@@ -45,22 +45,31 @@ WorldConfig.Worlds = {
 		Seed = 1337,
 		Zones = zones(1, {
 			{ Id = "Market", DisplayName = "Market Street", GroundColor = Color3.fromRGB(226, 205, 160) },
-			{ Id = "Yard", DisplayName = "Yard Sale", GroundColor = Color3.fromRGB(124, 192, 92) },
+			{ Id = "Yard", DisplayName = "Yard Sale", GroundColor = Color3.fromRGB(116, 162, 105) },
 			{ Id = "Farm", DisplayName = "Old Farm", GroundColor = Color3.fromRGB(206, 186, 110) },
-			{ Id = "Docks", DisplayName = "The Docks", GroundColor = Color3.fromRGB(160, 124, 88), Material = "WoodPlanks" },
+			{
+				Id = "Docks",
+				DisplayName = "The Docks",
+				GroundColor = Color3.fromRGB(160, 124, 88),
+				Material = "WoodPlanks",
+			},
 		}),
-		Bank = { Floor = Color3.fromRGB(255, 214, 90), Inner = Color3.fromRGB(255, 238, 180), Glow = Color3.fromRGB(255, 170, 40) },
+		Bank = {
+			Floor = Color3.fromRGB(255, 214, 90),
+			Inner = Color3.fromRGB(255, 238, 180),
+			Glow = Color3.fromRGB(255, 170, 40),
+		},
 		Water = Color3.fromRGB(56, 150, 214),
 		Lighting = {
 			ClockTime = 14.5,
-			Brightness = 2.6,
+			Brightness = 2.1,
 			Ambient = Color3.fromRGB(110, 100, 120),
 			OutdoorAmbient = Color3.fromRGB(150, 145, 160),
 			AtmosphereColor = Color3.fromRGB(200, 220, 255),
 			AtmosphereDecay = Color3.fromRGB(120, 150, 200),
 			AtmosphereDensity = 0.28,
 			Tint = Color3.fromRGB(255, 255, 255),
-			Saturation = 0.18,
+			Saturation = 0.04,
 		},
 	},
 	{
@@ -71,12 +80,26 @@ WorldConfig.Worlds = {
 		Theme = "Frostpeak",
 		Seed = 2718,
 		Zones = zones(5, {
-			{ Id = "Village", DisplayName = "Snowy Village", GroundColor = Color3.fromRGB(238, 244, 250), Material = "Snow" },
+			{
+				Id = "Village",
+				DisplayName = "Snowy Village",
+				GroundColor = Color3.fromRGB(238, 244, 250),
+				Material = "Snow",
+			},
 			{ Id = "Lodge", DisplayName = "Ski Lodge", GroundColor = Color3.fromRGB(214, 228, 242), Material = "Snow" },
 			{ Id = "Caves", DisplayName = "Ice Caves", GroundColor = Color3.fromRGB(150, 205, 235), Material = "Ice" },
-			{ Id = "Summit", DisplayName = "The Summit", GroundColor = Color3.fromRGB(150, 158, 175), Material = "Slate" },
+			{
+				Id = "Summit",
+				DisplayName = "The Summit",
+				GroundColor = Color3.fromRGB(150, 158, 175),
+				Material = "Slate",
+			},
 		}),
-		Bank = { Floor = Color3.fromRGB(120, 200, 255), Inner = Color3.fromRGB(225, 245, 255), Glow = Color3.fromRGB(90, 200, 255) },
+		Bank = {
+			Floor = Color3.fromRGB(120, 200, 255),
+			Inner = Color3.fromRGB(225, 245, 255),
+			Glow = Color3.fromRGB(90, 200, 255),
+		},
 		Water = Color3.fromRGB(170, 215, 240),
 		Lighting = {
 			ClockTime = 10,
@@ -100,10 +123,24 @@ WorldConfig.Worlds = {
 		Zones = zones(9, {
 			{ Id = "Sweets", DisplayName = "Sweet Street", GroundColor = Color3.fromRGB(255, 196, 222) },
 			{ Id = "Bakery", DisplayName = "Bakery Row", GroundColor = Color3.fromRGB(176, 238, 210) },
-			{ Id = "Beach", DisplayName = "Sugar Beach", GroundColor = Color3.fromRGB(250, 226, 170), Material = "Sand" },
-			{ Id = "Pier", DisplayName = "Candy Pier", GroundColor = Color3.fromRGB(214, 150, 190), Material = "WoodPlanks" },
+			{
+				Id = "Beach",
+				DisplayName = "Sugar Beach",
+				GroundColor = Color3.fromRGB(250, 226, 170),
+				Material = "Sand",
+			},
+			{
+				Id = "Pier",
+				DisplayName = "Candy Pier",
+				GroundColor = Color3.fromRGB(214, 150, 190),
+				Material = "WoodPlanks",
+			},
 		}),
-		Bank = { Floor = Color3.fromRGB(255, 120, 190), Inner = Color3.fromRGB(255, 225, 240), Glow = Color3.fromRGB(255, 90, 170) },
+		Bank = {
+			Floor = Color3.fromRGB(255, 120, 190),
+			Inner = Color3.fromRGB(255, 225, 240),
+			Glow = Color3.fromRGB(255, 90, 170),
+		},
 		Water = Color3.fromRGB(90, 215, 220),
 		Lighting = {
 			ClockTime = 16,
@@ -127,10 +164,19 @@ WorldConfig.Worlds = {
 		Zones = zones(13, {
 			{ Id = "Arcade", DisplayName = "Arcade Street", GroundColor = Color3.fromRGB(48, 44, 70) },
 			{ Id = "Mall", DisplayName = "Tech Mall", GroundColor = Color3.fromRGB(38, 46, 66) },
-			{ Id = "Factory", DisplayName = "Robot Factory", GroundColor = Color3.fromRGB(52, 52, 58), Material = "DiamondPlate" },
+			{
+				Id = "Factory",
+				DisplayName = "Robot Factory",
+				GroundColor = Color3.fromRGB(52, 52, 58),
+				Material = "DiamondPlate",
+			},
 			{ Id = "Skyline", DisplayName = "Skyline", GroundColor = Color3.fromRGB(30, 30, 44) },
 		}),
-		Bank = { Floor = Color3.fromRGB(150, 70, 255), Inner = Color3.fromRGB(60, 40, 100), Glow = Color3.fromRGB(0, 255, 230) },
+		Bank = {
+			Floor = Color3.fromRGB(150, 70, 255),
+			Inner = Color3.fromRGB(60, 40, 100),
+			Glow = Color3.fromRGB(0, 255, 230),
+		},
 		Water = Color3.fromRGB(20, 30, 70),
 		Lighting = {
 			ClockTime = 19.4,
