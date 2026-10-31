@@ -1,3 +1,11 @@
+## Resumo
+
+O Forgehand é um servidor MCP em stdio que delega uma tarefa de código a um único modelo local, num POST para `{base_url}/chat/completions`. A edição fica num worktree Git desanexado, só no escopo declarado. Os comandos aprovados rodam como argv, com `shell=False`. Cada passo recebe o contrato, o estado, os fatos do runtime e a última observação, sem histórico de conversa. O `result.json` traz status, caminho do diff, arquivos, comandos, incertezas e tokens.
+
+A stack é Python 3.11 ou superior, Git, mcp, pydantic, httpx, PyYAML e SQLite (`journal_mode=WAL`).
+
+Para rodar, instale `forgehand-local` por pip em `git+https://github.com/JVCSampaio/forgehand.git`. Rode `forgehand init` (padrão `ornith-ai/Ornith-1.5-9B` em `http://127.0.0.1:1234/v1`), `forgehand repo add` na raiz Git exata, `forgehand doctor` e `forgehand mcp`. No Codex: `codex mcp add forgehand -- forgehand mcp`. `forgehand run` lê um JSON. `forgehand dashboard` escuta em `127.0.0.1:8765`.
+
 <div align="center">
   <img src="docs/assets/forgehand.svg" alt="Forgehand" width="112" height="112">
   <h1>Forgehand</h1>
