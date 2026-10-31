@@ -1,11 +1,3 @@
-## Resumo
-
-O Forgehand é um servidor MCP em stdio que delega uma tarefa de código a um único modelo local, num POST para `{base_url}/chat/completions`. A edição fica num worktree Git desanexado, só no escopo declarado. Os comandos aprovados rodam como argv, com `shell=False`. Cada passo recebe o contrato, o estado, os fatos do runtime e a última observação, sem histórico de conversa. O `result.json` traz status, caminho do diff, arquivos, comandos, incertezas e tokens.
-
-A stack é Python 3.11 ou superior, Git, mcp, pydantic, httpx, PyYAML e SQLite (`journal_mode=WAL`).
-
-Para rodar, instale `forgehand-local` por pip em `git+https://github.com/JVCSampaio/forgehand.git`. Rode `forgehand init` (padrão `ornith-ai/Ornith-1.5-9B` em `http://127.0.0.1:1234/v1`), `forgehand repo add` na raiz Git exata, `forgehand doctor` e `forgehand mcp`. No Codex: `codex mcp add forgehand -- forgehand mcp`. `forgehand run` lê um JSON. `forgehand dashboard` escuta em `127.0.0.1:8765`.
-
 <div align="center">
   <img src="docs/assets/forgehand.svg" alt="Forgehand" width="112" height="112">
   <h1>Forgehand</h1>
@@ -25,6 +17,16 @@ the accumulated chat transcript.
 
 Bounded batch reads let the worker inspect up to eight scoped files in one model
 round-trip without turning the conversation transcript into memory.
+
+## Em português
+
+O Forgehand é um servidor MCP (stdio) em Python para delegar uma tarefa de código inteira a um modelo local com API compatível com a da OpenAI. O Codex planeja e revisa. O modelo local implementa num worktree Git separado, só nos caminhos que o contrato da tarefa declara, e roda apenas os comandos aprovados, sem shell. A cada passo ele recebe o estado atual, fatos do repositório e a última observação, em vez do histórico inteiro da conversa. No fim, devolve um recibo com o diff, os testes, as incertezas e os tokens gastos.
+
+Num microbenchmark com o mesmo contrato, o loop conversacional original gastou 25.826 tokens do modelo local, e o Forgehand, 10.708 (58,54% a menos), para a mesma alteração em um arquivo. Ficou 5,52% mais lento, porque o modelo precisou repetir algumas saídas estruturadas. É uma medição preliminar e vale só para os tokens do modelo local.
+
+Limite: não há sandbox do sistema operacional. Os comandos aprovados herdam a rede e as permissões da máquina, então aprove só comandos em que você confia.
+
+Stack: Python 3.11 ou superior, Git, MCP, Pydantic, httpx, PyYAML e SQLite. Para instalar, veja o [Quick start](#quick-start). O projeto adapta, sob licença MIT, o [codex-hermes-worker](https://github.com/RANJIANG23/codex-hermes-worker) (detalhes em [NOTICE](NOTICE)).
 
 ## Why
 
